@@ -188,3 +188,103 @@ class TestMetadataService:
 
             with pytest.raises(ValueError, match="Database 'testdb' not found"):
                 await service.fetch_metadata("testdb")
+
+    @pytest.mark.asyncio
+    async def test_cache_metadata_includes_table_comment(self, service):
+        """Test that cache_metadata passes table comment to save_metadata."""
+        columns = [
+            ColumnInfo(
+                name="id",
+                data_type="integer",
+                is_nullable=False,
+                is_primary_key=True,
+                comment="Primary key column",
+            ),
+        ]
+        tables = [
+            TableMetadata(
+                schema_name="public",
+                table_name="users",
+                table_type="table",
+                columns=columns,
+                comment="User information table",
+            ),
+        ]
+        metadata = DatabaseMetadata(
+            name="testdb",
+            schemas=["public"],
+            tables=tables,
+            last_refreshed="2024-01-01T00:00:00",
+        )
+
+        with patch("app.services.metadata_service.db_manager") as mock_db:
+            mock_db.clear_metadata_for_database = AsyncMock()
+            mock_db.save_metadata = AsyncMock()
+
+            await service.cache_metadata("testdb", metadata)
+
+            # Verify table_comment is passed
+            mock_db.save_metadata.assert_called_once()
+            call_kwargs = mock_db.save_metadata.call_args
+            assert call_kwargs.kwargs.get("table_comment") == "User information table"
+
+    @pytest.mark.asyncio
+    async def test_get_cached_metadata_restores_table_comment(self, service):
+        """Test that get_cached_metadata restores table comment from cache."""
+        mock_rows = [
+            {
+                "schema_name": "public",
+                "table_name": "users",
+                "table_type": "table",
+                "table_comment": "User information table",
+                "columns": [
+                    {
+                        "name": "id",
+                        "dataType": "integer",
+                        "isNullable": False,
+                        "isPrimaryKey": True,
+                        "comment": "Primary key column",
+                    }
+                ],
+                "created_at": "2024-01-01T00:00:00",
+            }
+        ]
+
+        with patch("app.services.metadata_service.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_rows)
+
+            result = await service.get_cached_metadata("testdb")
+
+            assert result is not None
+            assert result.tables[0].comment == "User information table"
+            assert result.tables[0].columns[0].comment == "Primary key column"
+
+    @pytest.mark.asyncio
+    async def test_get_cached_metadata_handles_null_comments(self, service):
+        """Test that get_cached_metadata handles null/missing comments gracefully."""
+        mock_rows = [
+            {
+                "schema_name": "public",
+                "table_name": "users",
+                "table_type": "table",
+                "table_comment": None,
+                "columns": [
+                    {
+                        "name": "id",
+                        "dataType": "integer",
+                        "isNullable": False,
+                        "isPrimaryKey": True,
+                    }
+                ],
+                "created_at": "2024-01-01T00:00:00",
+            }
+        ]
+
+        with patch("app.services.metadata_service.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_rows)
+
+            result = await service.get_cached_metadata("testdb")
+
+            assert result is not None
+            assert result.tables[0].comment is None
+            assert result.tables[0].columns[0].comment is None

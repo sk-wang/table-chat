@@ -174,6 +174,7 @@ class MetadataService:
                 table_name=table.table_name,
                 table_type=table.table_type,
                 columns=columns_data,
+                table_comment=table.comment,
             )
 
     async def get_cached_metadata(self, db_name: str) -> DatabaseMetadata | None:
@@ -222,6 +223,7 @@ class MetadataService:
                     table_name=row.get("table_name", "unknown"),
                     table_type=row.get("table_type", "table"),
                     columns=columns,
+                    comment=row.get("table_comment"),
                 )
             )
 

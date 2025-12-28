@@ -35,6 +35,35 @@ interface DatabaseSidebarProps {
 
 const { Text } = Typography;
 
+// Helper function to truncate text and return if truncated
+const truncateText = (text: string | undefined | null, maxLength: number): { text: string; isTruncated: boolean } => {
+  if (!text) return { text: '', isTruncated: false };
+  if (text.length <= maxLength) return { text, isTruncated: false };
+  return { text: text.slice(0, maxLength) + '...', isTruncated: true };
+};
+
+// Comment display component with optional tooltip for long text
+const CommentText: React.FC<{ comment: string | undefined | null; maxLength: number }> = ({ comment, maxLength }) => {
+  if (!comment) return null;
+  const { text, isTruncated } = truncateText(comment, maxLength);
+  
+  const content = (
+    <span style={{ color: '#808080', marginLeft: 6, fontSize: 10, fontStyle: 'italic' }}>
+      {text}
+    </span>
+  );
+  
+  if (isTruncated) {
+    return (
+      <Tooltip title={comment} placement="right">
+        {content}
+      </Tooltip>
+    );
+  }
+  
+  return content;
+};
+
 export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   metadata,
   metadataLoading,
@@ -101,6 +130,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
             <span style={{ color: '#666', marginLeft: 4, fontSize: 10 }}>
               ({table.columns?.length || 0} cols)
             </span>
+            <CommentText comment={table.comment} maxLength={50} />
           </span>
         ),
         icon: table.tableType === 'view' 
@@ -121,6 +151,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                 {column.dataType}
                 {!column.isNullable && <span style={{ color: '#cc7832' }}> NOT NULL</span>}
               </span>
+              <CommentText comment={column.comment} maxLength={30} />
             </span>
           ),
           isLeaf: true,

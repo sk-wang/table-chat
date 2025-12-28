@@ -20,12 +20,14 @@
     "@refinedev/antd": "^6.0.3",
     "@refinedev/core": "^5.0.7",
     "@refinedev/react-router": "^2.0.3",
+    "@types/react-resizable": "^3.0.8",
     "antd": "^5.29.3",
     "autoprefixer": "^10.4.23",
     "axios": "^1.13.2",
     "postcss": "^8.5.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-resizable": "^3.0.5",
     "react-router-dom": "^7.11.0",
     "tailwindcss": "^4.1.18"
   },
@@ -40,6 +42,7 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^2.1.8",
     "@vitest/ui": "^2.1.8",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
@@ -52,7 +55,6 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^2.1.8",
-    "@vitest/coverage-v8": "^2.1.8"
+    "vitest": "^2.1.8"
   }
 }

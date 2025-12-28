@@ -312,6 +312,7 @@ export const QueryPage: React.FC = () => {
             result={result}
             executionTimeMs={executionTimeMs}
             loading={executing}
+            metadata={metadata}
           />
         </div>
       </Content>

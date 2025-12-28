@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS table_metadata (
     schema_name TEXT NOT NULL,
     table_name TEXT NOT NULL,
     table_type TEXT NOT NULL CHECK (table_type IN ('table', 'view')),
+    table_comment TEXT,
     columns_json TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE (db_name, schema_name, table_name),
@@ -32,6 +33,11 @@ CREATE TABLE IF NOT EXISTS table_metadata (
 );
 
 CREATE INDEX IF NOT EXISTS idx_metadata_db ON table_metadata(db_name);
+"""
+
+# Migration SQL for existing databases
+MIGRATION_ADD_TABLE_COMMENT = """
+ALTER TABLE table_metadata ADD COLUMN table_comment TEXT;
 """
 
 
@@ -54,6 +60,21 @@ class SQLiteManager:
         async with self.get_connection() as conn:
             await conn.executescript(SCHEMA_SQL)
             await conn.commit()
+            # Run migration for existing databases
+            await self._migrate_add_table_comment(conn)
+
+    async def _migrate_add_table_comment(self, conn: aiosqlite.Connection) -> None:
+        """Add table_comment column if it doesn't exist (migration for existing DBs)."""
+        cursor = await conn.execute("PRAGMA table_info(table_metadata)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        if "table_comment" not in column_names:
+            try:
+                await conn.execute(MIGRATION_ADD_TABLE_COMMENT)
+                await conn.commit()
+            except Exception:
+                # Column already exists or other error, ignore
+                pass
 
     # === Database CRUD Operations ===
 
@@ -110,7 +131,7 @@ class SQLiteManager:
         async with self.get_connection() as conn:
             cursor = await conn.execute(
                 """
-                SELECT schema_name, table_name, table_type, columns_json, created_at
+                SELECT schema_name, table_name, table_type, table_comment, columns_json, created_at
                 FROM table_metadata
                 WHERE db_name = ?
                 ORDER BY schema_name, table_name
@@ -132,6 +153,7 @@ class SQLiteManager:
         table_name: str,
         table_type: str,
         columns: list[dict[str, Any]],
+        table_comment: str | None = None,
     ) -> None:
         """Save or update table metadata."""
         columns_json = json.dumps(columns)
@@ -139,14 +161,15 @@ class SQLiteManager:
         async with self.get_connection() as conn:
             await conn.execute(
                 """
-                INSERT INTO table_metadata (db_name, schema_name, table_name, table_type, columns_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO table_metadata (db_name, schema_name, table_name, table_type, table_comment, columns_json, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (db_name, schema_name, table_name) DO UPDATE SET
                     table_type = excluded.table_type,
+                    table_comment = excluded.table_comment,
                     columns_json = excluded.columns_json,
                     created_at = excluded.created_at
                 """,
-                (db_name, schema_name, table_name, table_type, columns_json, now),
+                (db_name, schema_name, table_name, table_type, table_comment, columns_json, now),
             )
             await conn.commit()
 
