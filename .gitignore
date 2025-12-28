@@ -66,4 +66,9 @@ coverage.xml
 .pytest_cache/
 .mypy_cache/
 
+# Frontend test coverage
+frontend/coverage/
+
+frontend/.vite
+
 .claude/settings.local.json

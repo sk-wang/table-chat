@@ -97,8 +97,30 @@ body {
 }
 
 .ant-collapse > .ant-collapse-item > .ant-collapse-content > .ant-collapse-content-box {
-  padding: 0 12px !important;
+  padding: 0 !important;
   background: #3c3f41 !important;
+}
+
+/* Tree 组件样式 */
+.ant-tree {
+  background: transparent !important;
+}
+
+.ant-tree .ant-tree-treenode {
+  padding: 2px 8px 2px 4px !important;
+  width: 100% !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  flex: 1 !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+}
+
+.ant-tree .ant-tree-title {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
 /* Tree component in sidebar */

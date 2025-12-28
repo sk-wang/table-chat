@@ -207,13 +207,17 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       key: 'databases',
       label: databasesHeader,
       children: (
-        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+        <div style={{ 
+          maxHeight: 200, 
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}>
           {loading ? (
-            <div style={{ padding: 12, textAlign: 'center' }}>
+            <div style={{ padding: '12px', textAlign: 'center' }}>
               <Spin size="small" />
             </div>
           ) : databases.length === 0 ? (
-            <div style={{ padding: 12, textAlign: 'center' }}>
+            <div style={{ padding: '12px', textAlign: 'center' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 No databases
               </Text>
@@ -233,17 +237,14 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                 key={db.name}
                 onClick={() => setSelectedDatabase(db.name)}
                 style={{
-                  padding: '5px 8px',
+                  padding: '6px 12px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: 8,
                   background: selectedDatabase === db.name ? '#4e5254' : 'transparent',
                   borderLeft: selectedDatabase === db.name ? '2px solid #589df6' : '2px solid transparent',
-                  marginLeft: -12,
-                  marginRight: -12,
-                  paddingLeft: 12,
-                  paddingRight: 8,
                 }}
                 onMouseEnter={e => {
                   if (selectedDatabase !== db.name) {
@@ -256,17 +257,29 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                   }
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden', flex: 1 }}>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 6, 
+                  overflow: 'hidden', 
+                  flex: 1,
+                  minWidth: 0,
+                }}>
                   <DatabaseOutlined style={{ 
                     color: selectedDatabase === db.name ? '#589df6' : '#6897bb',
                     flexShrink: 0,
                     fontSize: 12,
                   }} />
                   <Text 
-                    ellipsis 
+                    ellipsis={{ tooltip: db.name }}
                     style={{ 
                       color: selectedDatabase === db.name ? '#fff' : '#a9b7c6',
                       fontSize: 12,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1,
+                      minWidth: 0,
                     }}
                   >
                     {db.name}
@@ -293,6 +306,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                       opacity: 0.5,
                       height: 20,
                       minWidth: 20,
+                      flexShrink: 0,
                     }}
                     onMouseEnter={e => e.currentTarget.style.opacity = '1'}
                     onMouseLeave={e => e.currentTarget.style.opacity = '0.5'}
@@ -308,15 +322,19 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       key: 'schema',
       label: schemaHeader,
       children: (
-        <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 300px)' }}>
+        <div style={{ 
+          overflowY: 'auto', 
+          overflowX: 'hidden',
+          maxHeight: 'calc(100vh - 300px)',
+        }}>
           {!selectedDatabase ? (
-            <div style={{ padding: 12, textAlign: 'center' }}>
+            <div style={{ padding: '12px', textAlign: 'center' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 Select a database first
               </Text>
             </div>
           ) : metadataLoading ? (
-            <div style={{ padding: 12, textAlign: 'center' }}>
+            <div style={{ padding: '12px', textAlign: 'center' }}>
               <Spin size="small" />
               <br />
               <Text type="secondary" style={{ fontSize: 11, marginTop: 8 }}>
@@ -324,29 +342,19 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
               </Text>
             </div>
           ) : metadata && metadata.length > 0 ? (
-            <>
-              <Tree
-                showIcon
-                defaultExpandAll
-                treeData={buildMetadataTree()}
-                onSelect={handleTreeSelect}
-                style={{ 
-                  background: 'transparent',
-                  fontSize: 12,
-                }}
-              />
-              <div style={{ 
-                padding: '6px 8px',
-                borderTop: '1px solid #323232',
-                marginTop: 8,
-              }}>
-                <Text type="secondary" style={{ fontSize: 10 }}>
-                  💡 Click table to generate SELECT
-                </Text>
-              </div>
-            </>
+            <Tree
+              showIcon
+              defaultExpandAll
+              treeData={buildMetadataTree()}
+              onSelect={handleTreeSelect}
+              style={{ 
+                background: 'transparent',
+                fontSize: 12,
+                padding: '4px 0',
+              }}
+            />
           ) : (
-            <div style={{ padding: 12, textAlign: 'center' }}>
+            <div style={{ padding: '12px', textAlign: 'center' }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 No tables found
               </Text>
@@ -364,6 +372,8 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       flexDirection: 'column',
       background: '#3c3f41',
       overflow: 'hidden',
+      width: '100%',
+      minWidth: 0,
     }}>
       <Collapse
         activeKey={activeKeys}
@@ -377,9 +387,24 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
+          overflow: 'hidden',
         }}
         items={collapseItems}
       />
+
+      {/* Fixed hint at bottom */}
+      {selectedDatabase && metadata && metadata.length > 0 && (
+        <div style={{ 
+          padding: '8px 12px',
+          borderTop: '1px solid #323232',
+          background: '#313335',
+          flexShrink: 0,
+        }}>
+          <Text type="secondary" style={{ fontSize: 10 }}>
+            💡 Click table to generate SELECT
+          </Text>
+        </div>
+      )}
 
       {/* Add Database Modal */}
       <AddDatabaseModal
