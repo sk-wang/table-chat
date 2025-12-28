@@ -1,0 +1,109 @@
+# API Contract: Table Search Feature
+
+**Feature**: 003-table-search | **Date**: 2025-12-28
+
+**Note**: 本功能采用纯前端搜索方案，不涉及后端 API。此文档记录可选的搜索 API 设计（如后续需要性能优化）。
+
+---
+
+## Option A: Pure Frontend Search (Current Implementation)
+
+无后端 API，客户端使用 `getDatabaseMetadata` 获取元数据后进行本地过滤。
+
+### Data Flow
+
+```
+User Input → useState → filter() → Display
+              │
+              └── debounce (300ms)
+```
+
+---
+
+## Option B: Backend Search API (Future Optimization)
+
+如前端过滤性能不足，可实现此 API。
+
+### GET /api/v1/dbs/{database}/tables/search
+
+搜索数据库中的表。
+
+#### Request
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `database` | string | Yes | 数据库名称 |
+| `q` | string | Yes | 搜索关键词 |
+| `schema` | string | No | 可选：限定 schema 范围 |
+| `limit` | integer | No | 限制返回数量，默认 100 |
+
+#### Response
+
+```json
+{
+  "tables": [
+    {
+      "schemaName": "public",
+      "tableName": "user_orders",
+      "tableType": "table",
+      "columns": [],
+      "rowCount": 1000,
+      "comment": "用户订单表"
+    }
+  ],
+  "total": 5,
+  "executionTimeMs": 15
+}
+```
+
+#### Response Codes
+
+| Code | Description |
+|------|-------------|
+| 200 | 成功返回 |
+| 400 | 参数错误 |
+| 404 | 数据库不存在 |
+| 500 | 服务器错误 |
+
+#### Example
+
+```http
+GET /api/v1/dbs/myapp/tables/search?q=user HTTP/1.1
+Host: localhost:8000
+```
+
+```json
+{
+  "tables": [
+    {
+      "schemaName": "public",
+      "tableName": "user_orders",
+      "tableType": "table",
+      "columns": [],
+      "rowCount": null,
+      "comment": null
+    },
+    {
+      "schemaName": "public",
+      "tableName": "user_profiles",
+      "tableType": "table",
+      "columns": [],
+      "rowCount": null,
+      "comment": null
+    }
+  ],
+  "total": 2,
+  "executionTimeMs": 8
+}
+```
+
+---
+
+## Implementation Decision
+
+当前采用 **Option A**（纯前端搜索），因为：
+- 500+ 表的客户端过滤性能足够（< 15ms）
+- 避免网络延迟，用户体验更流畅
+- 架构简单，无需后端改动
+
+如果性能测试发现瓶颈，可切换到 Option B。

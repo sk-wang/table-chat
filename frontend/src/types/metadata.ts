@@ -25,3 +25,16 @@ export interface DatabaseMetadata {
   lastRefreshed?: string;
 }
 
+// Table search state types
+export interface TableSearchState {
+  query: string;
+  isActive: boolean;
+  filteredCount: number;
+}
+
+export interface TableSearchResult {
+  filteredTables: TableMetadata[];
+  totalCount: number;
+  resultCount: number;
+}
+

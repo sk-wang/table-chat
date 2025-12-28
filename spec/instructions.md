@@ -69,10 +69,10 @@ POST /api/v1/dbs/{name}/query/natural
 字段注释和表注释，要在合适的地方显示，比如查询结构，表结构树中。效果类似阿里云DMS，查询结果中直接显示注释，列宽可拉拽
 
 ## 搜索表
-一个库的表可能有几百张，需要有个搜索功能
+一个库的表可能有几百张，需要有个搜索表功能
 
 ## 添加MySQL db支持
-参考backend中的postgresSQL实现，实现Mysql的metadata提取和查询支持，同时自然语言生成也支持MySQL.目前我本地有一个mysql库连接字符串是 mysql://root:123456@localhost:3306/scinew。
+参考backend中的postgresSQL实现，实现Mysql的metadata提取和查询支持，同时自然语言生成也支持MySQL.目前我本地有一个mysql库连接字符串是 mysql://root:123456@localhost:3306/scinew。由于之前实现只考虑了postgre，在新实现mysql的功能时，要注意SOLID原则，必要时进行代码的重构。
 
 
 ## 导出功能

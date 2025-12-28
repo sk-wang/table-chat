@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { 
-  Typography, 
-  Button, 
-  Popconfirm, 
-  message, 
+import React, { useState, useCallback, useMemo } from 'react';
+import {
+  Typography,
+  Button,
+  Popconfirm,
+  message,
   Spin,
   Tooltip,
   Tree,
   Collapse,
 } from 'antd';
-import { 
-  DatabaseOutlined, 
-  PlusOutlined, 
+import {
+  DatabaseOutlined,
+  PlusOutlined,
   DeleteOutlined,
   ReloadOutlined,
   TableOutlined,
@@ -25,6 +25,7 @@ import { useDatabase } from '../../contexts/DatabaseContext';
 import { AddDatabaseModal } from '../database/AddDatabaseModal';
 import { apiClient } from '../../services/api';
 import type { TableMetadata } from '../../types/metadata';
+import { TableSearchInput } from './TableSearchInput';
 
 interface DatabaseSidebarProps {
   metadata: TableMetadata[] | null;
@@ -70,6 +71,8 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [activeKeys, setActiveKeys] = useState<string[]>(['databases', 'schema']);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filteredTables, setFilteredTables] = useState<TableMetadata[] | null>(null);
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,13 +92,38 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     refreshDatabases();
   };
 
+  // Handle search input
+  const handleSearch = useCallback((query: string, results: TableMetadata[]) => {
+    setSearchQuery(query);
+    setFilteredTables(results);
+  }, []);
+
+  // Get tables to display (filtered or original)
+  const displayTables = useMemo(() => {
+    if (searchQuery && filteredTables) {
+      return filteredTables;
+    }
+    return metadata;
+  }, [searchQuery, filteredTables, metadata]);
+
+  // Calculate table count for display
+  const tableCount = useMemo(() => {
+    if (!displayTables) return 0;
+    return displayTables.length;
+  }, [displayTables]);
+
+  // Calculate original table count
+  const originalTableCount = useMemo(() => {
+    return metadata?.length || 0;
+  }, [metadata]);
+
   // Build tree data for metadata with columns
   const buildMetadataTree = (): DataNode[] => {
-    if (!metadata || metadata.length === 0) return [];
+    if (!displayTables || displayTables.length === 0) return [];
 
     // Group by schema
     const schemaMap = new Map<string, TableMetadata[]>();
-    metadata.forEach(table => {
+    displayTables.forEach(table => {
       const schema = table.schemaName || 'public';
       if (!schemaMap.has(schema)) {
         schemaMap.set(schema, []);
@@ -197,14 +225,16 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
 
   // Custom panel header for Schema
   const schemaHeader = (
-    <div style={{ 
-      display: 'flex', 
-      alignItems: 'center', 
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
       justifyContent: 'space-between',
       width: '100%',
     }}>
       <Text strong style={{ color: '#a9b7c6', fontSize: 11, textTransform: 'uppercase' }}>
-        Schema {metadata ? `(${metadata.length} tables)` : ''}
+        Schema {searchQuery
+          ? `(${tableCount} of ${originalTableCount})`
+          : metadata ? `(${metadata.length} tables)` : ''}
       </Text>
       {onRefreshMetadata && (
         <div onClick={e => e.stopPropagation()}>
@@ -342,44 +372,67 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       key: 'schema',
       label: schemaHeader,
       children: (
-        <div style={{ 
-          overflowY: 'auto', 
-          overflowX: 'hidden',
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
           flex: 1,
         }}>
-          {!selectedDatabase ? (
-            <div style={{ padding: '12px', textAlign: 'center' }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Select a database first
-              </Text>
-            </div>
-          ) : metadataLoading ? (
-            <div style={{ padding: '12px', textAlign: 'center' }}>
-              <Spin size="small" />
-              <br />
-              <Text type="secondary" style={{ fontSize: 11, marginTop: 8 }}>
-                Loading...
-              </Text>
-            </div>
-          ) : metadata && metadata.length > 0 ? (
-            <Tree
-              showIcon
-              defaultExpandAll
-              treeData={buildMetadataTree()}
-              onSelect={handleTreeSelect}
-              style={{ 
-                background: 'transparent',
-                fontSize: 12,
-                padding: '4px 0',
-              }}
+          {/* Search input */}
+          {selectedDatabase && metadata && metadata.length > 0 && (
+            <TableSearchInput
+              tables={metadata}
+              onSearch={handleSearch}
+              placeholder="Search tables..."
             />
-          ) : (
-            <div style={{ padding: '12px', textAlign: 'center' }}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                No tables found
-              </Text>
-            </div>
           )}
+
+          {/* Table tree */}
+          <div style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+          }}>
+            {!selectedDatabase ? (
+              <div style={{ padding: '12px', textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Select a database first
+                </Text>
+              </div>
+            ) : metadataLoading ? (
+              <div style={{ padding: '12px', textAlign: 'center' }}>
+                <Spin size="small" />
+                <br />
+                <Text type="secondary" style={{ fontSize: 11, marginTop: 8 }}>
+                  Loading...
+                </Text>
+              </div>
+            ) : searchQuery && tableCount === 0 ? (
+              <div style={{ padding: '12px', textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  No tables found for "{searchQuery}"
+                </Text>
+              </div>
+            ) : displayTables && tableCount > 0 ? (
+              <Tree
+                showIcon
+                defaultExpandAll
+                treeData={buildMetadataTree()}
+                onSelect={handleTreeSelect}
+                style={{
+                  background: 'transparent',
+                  fontSize: 12,
+                  padding: '4px 0',
+                }}
+              />
+            ) : (
+              <div style={{ padding: '12px', textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  No tables found
+                </Text>
+              </div>
+            )}
+          </div>
         </div>
       ),
     },
@@ -473,15 +526,15 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       />
 
       {/* Fixed hint at bottom */}
-      {selectedDatabase && metadata && metadata.length > 0 && (
-        <div style={{ 
+      {selectedDatabase && displayTables && tableCount > 0 && (
+        <div style={{
           padding: '8px 12px',
           borderTop: '1px solid #323232',
           background: '#313335',
           flexShrink: 0,
         }}>
           <Text type="secondary" style={{ fontSize: 10 }}>
-            💡 Click table to generate SELECT
+            {searchQuery ? `Showing ${tableCount} of ${originalTableCount} tables` : '💡 Click table to generate SELECT'}
           </Text>
         </div>
       )}
