@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # PostgreSQL Connection Timeout (seconds)
     pg_connect_timeout: int = 10
 
+    # MySQL Connection Timeout (seconds)
+    mysql_connect_timeout: int = 10
+
     @property
     def effective_llm_api_base(self) -> str:
         """Get effective LLM API base URL."""

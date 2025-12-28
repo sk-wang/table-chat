@@ -15,6 +15,7 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS databases (
     name TEXT PRIMARY KEY,
     url TEXT NOT NULL,
+    db_type TEXT NOT NULL DEFAULT 'postgresql',
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -36,6 +37,10 @@ CREATE INDEX IF NOT EXISTS idx_metadata_db ON table_metadata(db_name);
 """
 
 # Migration SQL for existing databases
+MIGRATION_ADD_DB_TYPE = """
+ALTER TABLE databases ADD COLUMN db_type TEXT DEFAULT 'postgresql';
+"""
+
 MIGRATION_ADD_TABLE_COMMENT = """
 ALTER TABLE table_metadata ADD COLUMN table_comment TEXT;
 """
@@ -60,8 +65,22 @@ class SQLiteManager:
         async with self.get_connection() as conn:
             await conn.executescript(SCHEMA_SQL)
             await conn.commit()
-            # Run migration for existing databases
+            # Run migrations for existing databases
+            await self._migrate_add_db_type(conn)
             await self._migrate_add_table_comment(conn)
+
+    async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
+        """Add db_type column if it doesn't exist (migration for existing DBs)."""
+        cursor = await conn.execute("PRAGMA table_info(databases)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        if "db_type" not in column_names:
+            try:
+                await conn.execute(MIGRATION_ADD_DB_TYPE)
+                await conn.commit()
+            except Exception:
+                # Column already exists or other error, ignore
+                pass
 
     async def _migrate_add_table_comment(self, conn: aiosqlite.Connection) -> None:
         """Add table_comment column if it doesn't exist (migration for existing DBs)."""
@@ -82,7 +101,7 @@ class SQLiteManager:
         """List all saved database connections."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, created_at, updated_at FROM databases ORDER BY name"
+                "SELECT name, url, db_type, created_at, updated_at FROM databases ORDER BY name"
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -91,13 +110,15 @@ class SQLiteManager:
         """Get a database connection by name."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, created_at, updated_at FROM databases WHERE name = ?",
+                "SELECT name, url, db_type, created_at, updated_at FROM databases WHERE name = ?",
                 (name,),
             )
             row = await cursor.fetchone()
             return dict(row) if row else None
 
-    async def create_or_update_database(self, name: str, url: str) -> dict[str, Any]:
+    async def create_or_update_database(
+        self, name: str, url: str, db_type: str = "postgresql"
+    ) -> dict[str, Any]:
         """Create or update a database connection."""
         now = datetime.now().isoformat()
         async with self.get_connection() as conn:
@@ -105,13 +126,13 @@ class SQLiteManager:
             existing = await self.get_database(name)
             if existing:
                 await conn.execute(
-                    "UPDATE databases SET url = ?, updated_at = ? WHERE name = ?",
-                    (url, now, name),
+                    "UPDATE databases SET url = ?, db_type = ?, updated_at = ? WHERE name = ?",
+                    (url, db_type, now, name),
                 )
             else:
                 await conn.execute(
-                    "INSERT INTO databases (name, url, created_at, updated_at) VALUES (?, ?, ?, ?)",
-                    (name, url, now, now),
+                    "INSERT INTO databases (name, url, db_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (name, url, db_type, now, now),
                 )
             await conn.commit()
 
@@ -182,4 +203,3 @@ class SQLiteManager:
 
 # Global instance
 db_manager = SQLiteManager()
-

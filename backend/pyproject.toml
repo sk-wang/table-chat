@@ -12,6 +12,7 @@ dependencies = [
     "sqlglot>=26.0.0",
     "openai>=1.58.0",
     "psycopg2-binary>=2.9.10",
+    "mysql-connector-python>=9.1.0",
     "aiosqlite>=0.20.0",
     "pyhumps>=3.8.0",
     "python-dotenv>=1.0.0",

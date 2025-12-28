@@ -1,26 +1,25 @@
 """SQL query execution service."""
 
-import asyncio
 import time
 from typing import Any
 
-import psycopg2
-from psycopg2.extensions import connection as PgConnection
 import sqlglot
 from sqlglot import exp
 
 from app.services.db_manager import database_manager
+from app.connectors.factory import ConnectorFactory
 
 
 class QueryService:
     """Service for SQL query parsing and execution."""
 
-    def parse_sql(self, sql: str) -> exp.Expression:
+    def parse_sql(self, sql: str, dialect: str = "postgres") -> exp.Expression:
         """
         Parse SQL using sqlglot.
 
         Args:
             sql: SQL statement to parse
+            dialect: SQL dialect (postgres or mysql)
 
         Returns:
             Parsed SQL expression
@@ -29,7 +28,7 @@ class QueryService:
             ValueError: If SQL is invalid
         """
         try:
-            parsed = sqlglot.parse_one(sql, dialect="postgres")
+            parsed = sqlglot.parse_one(sql, dialect=dialect)
             return parsed
         except Exception as e:
             raise ValueError(f"SQL syntax error: {e}") from e
@@ -51,13 +50,14 @@ class QueryService:
                 "INSERT, UPDATE, DELETE, and DDL statements are not permitted."
             )
 
-    def inject_limit(self, sql: str, parsed: exp.Expression) -> tuple[str, bool]:
+    def inject_limit(self, sql: str, parsed: exp.Expression, dialect: str = "postgres") -> tuple[str, bool]:
         """
         Add LIMIT 1000 if no LIMIT clause exists.
 
         Args:
             sql: Original SQL
             parsed: Parsed SQL expression
+            dialect: SQL dialect
 
         Returns:
             Tuple of (modified SQL, was_truncated)
@@ -68,14 +68,14 @@ class QueryService:
 
         # Add LIMIT 1000
         parsed_with_limit = parsed.limit(1000)
-        modified_sql = parsed_with_limit.sql(dialect="postgres")
+        modified_sql = parsed_with_limit.sql(dialect=dialect)
         return modified_sql, True
 
     async def execute_query(
         self, db_name: str, sql: str
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """
-        Execute SQL query against PostgreSQL database.
+        Execute SQL query against database.
 
         Args:
             db_name: Database name
@@ -91,58 +91,9 @@ class QueryService:
         # Get connection URL
         url = await database_manager.get_connection(db_name)
 
-        def _execute() -> tuple[list[str], list[dict[str, Any]], int]:
-            """Synchronous query execution."""
-            start_time = time.time()
-            conn: PgConnection | None = None
-
-            try:
-                conn = psycopg2.connect(url)
-                cursor = conn.cursor()
-
-                # Execute query
-                cursor.execute(sql)
-
-                # Get column names
-                columns = [desc[0] for desc in cursor.description] if cursor.description else []
-
-                # Fetch all rows as dicts
-                rows = []
-                if cursor.description:
-                    for row in cursor.fetchall():
-                        row_dict = {columns[i]: self._serialize_value(val) for i, val in enumerate(row)}
-                        rows.append(row_dict)
-
-                execution_time_ms = int((time.time() - start_time) * 1000)
-
-                return columns, rows, execution_time_ms
-
-            finally:
-                if conn:
-                    conn.close()
-
-        # Run in thread pool
-        return await asyncio.to_thread(_execute)
-
-    def _serialize_value(self, value: Any) -> Any:
-        """Convert PostgreSQL types to JSON-serializable types."""
-        # Handle None
-        if value is None:
-            return None
-
-        # Handle dates/times
-        if hasattr(value, "isoformat"):
-            return value.isoformat()
-
-        # Handle bytes
-        if isinstance(value, bytes):
-            try:
-                return value.decode("utf-8")
-            except UnicodeDecodeError:
-                return str(value)
-
-        # Handle other types
-        return value
+        # Get connector and execute query
+        connector = ConnectorFactory.get_connector(url)
+        return await connector.execute_query(url, sql)
 
     async def execute_validated_query(
         self, db_name: str, sql: str
@@ -160,21 +111,25 @@ class QueryService:
         Raises:
             ValueError: If SQL is invalid or not a SELECT statement
         """
+        # Get connection URL to determine dialect
+        url = await database_manager.get_connection(db_name)
+        connector = ConnectorFactory.get_connector(url)
+        dialect = connector.get_dialect()
+
         # Parse SQL
-        parsed = self.parse_sql(sql.strip())
+        parsed = self.parse_sql(sql.strip(), dialect)
 
         # Validate SELECT only
         self.validate_select_only(parsed)
 
         # Inject LIMIT if needed
-        final_sql, truncated = self.inject_limit(sql, parsed)
+        final_sql, truncated = self.inject_limit(sql, parsed, dialect)
 
         # Execute query
-        columns, rows, execution_time_ms = await self.execute_query(db_name, final_sql)
+        columns, rows, execution_time_ms = await connector.execute_query(url, final_sql)
 
         return final_sql, columns, rows, execution_time_ms, truncated
 
 
 # Global instance
 query_service = QueryService()
-

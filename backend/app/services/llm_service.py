@@ -12,6 +12,57 @@ from app.services.db_manager import database_manager
 class LLMService:
     """Service for natural language to SQL conversion using LLM."""
 
+    # SQL dialect prompts
+    DIALECT_PROMPTS = {
+        "postgresql": {
+            "system": """You are a SQL expert assistant. Your task is to generate PostgreSQL SELECT queries based on natural language descriptions.
+
+RULES:
+1. ONLY generate SELECT queries. Never generate INSERT, UPDATE, DELETE, or DDL statements.
+2. Always use proper PostgreSQL syntax.
+3. Use table aliases for readability.
+4. Add appropriate LIMIT clause if not specified (default: 100).
+5. Use schema-qualified table names when available (e.g., public.users).
+6. Handle NULL values appropriately.
+7. Use proper JOIN syntax when relating tables.
+8. Use PostgreSQL-specific functions and operators when appropriate.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+- "sql": The generated SQL query
+- "explanation": A brief explanation of what the query does (in Chinese)
+
+Example output:
+{"sql": "SELECT * FROM public.users WHERE age > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户"}
+""",
+            "user_suffix": "Generate a PostgreSQL SELECT query for this request.",
+        },
+        "mysql": {
+            "system": """You are a SQL expert assistant. Your task is to generate MySQL SELECT queries based on natural language descriptions.
+
+RULES:
+1. ONLY generate SELECT queries. Never generate INSERT, UPDATE, DELETE, or DDL statements.
+2. Always use proper MySQL syntax.
+3. Use table aliases for readability.
+4. Add appropriate LIMIT clause if not specified (default: 100).
+5. Use backtick quotes for table and column names (e.g., `table_name`).
+6. Handle NULL values appropriately with IS NULL/IS NOT NULL.
+7. Use proper JOIN syntax when relating tables.
+8. Use MySQL-specific functions when appropriate (e.g., IFNULL, COALESCE, DATE_FORMAT).
+9. For LIMIT with offset, use LIMIT offset, count syntax.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+- "sql": The generated SQL query
+- "explanation": A brief explanation of what the query does (in Chinese)
+
+Example output:
+{"sql": "SELECT * FROM `users` WHERE `age` > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户"}
+""",
+            "user_suffix": "Generate a MySQL SELECT query for this request.",
+        },
+    }
+
     def __init__(self):
         """Initialize LLM service."""
         self._client: OpenAI | None = None
@@ -24,7 +75,7 @@ class LLMService:
                 raise ValueError(
                     "LLM API is not configured. Please set LLM_API_KEY environment variable."
                 )
-            
+
             self._client = OpenAI(
                 api_key=settings.effective_llm_api_key,
                 base_url=settings.effective_llm_api_base,
@@ -54,15 +105,15 @@ class LLMService:
 
             # Try to get cached metadata from SQLite
             from app.db.sqlite import db_manager
-            
+
             metadata = await db_manager.get_metadata_for_database(db_name)
-            
+
             if not metadata:
                 return "No tables found in this database."
 
             # Build schema description
             lines = ["Database Schema:", "=" * 40, ""]
-            
+
             for table_info in metadata:
                 schema_name = table_info.get("schema_name", "public")
                 table_name = table_info.get("table_name", "unknown")
@@ -72,18 +123,18 @@ class LLMService:
 
                 lines.append(f"Table: {schema_name}.{table_name} ({table_type})")
                 lines.append("-" * 40)
-                
+
                 for col in columns:
                     col_name = col.get("name", "unknown")
                     col_type = col.get("dataType", col.get("data_type", "unknown"))
                     is_nullable = col.get("isNullable", col.get("is_nullable", True))
                     is_pk = col.get("isPrimaryKey", col.get("is_primary_key", False))
-                    
+
                     nullable_str = "" if is_nullable else " NOT NULL"
                     pk_str = " PRIMARY KEY" if is_pk else ""
-                    
+
                     lines.append(f"  - {col_name}: {col_type}{nullable_str}{pk_str}")
-                
+
                 lines.append("")
 
             return "\n".join(lines)
@@ -95,6 +146,7 @@ class LLMService:
         self,
         db_name: str,
         prompt: str,
+        db_type: str = "postgresql",
     ) -> tuple[str, str | None]:
         """
         Generate SQL from natural language prompt.
@@ -102,6 +154,7 @@ class LLMService:
         Args:
             db_name: Database name for schema context
             prompt: Natural language description of the query
+            db_type: Database type ('postgresql' or 'mysql')
 
         Returns:
             Tuple of (generated_sql, explanation)
@@ -110,36 +163,21 @@ class LLMService:
             ValueError: If LLM is not configured
             Exception: If LLM API call fails
         """
+        # Get dialect prompts
+        dialect_config = self.DIALECT_PROMPTS.get(db_type, self.DIALECT_PROMPTS["postgresql"])
+        system_prompt = dialect_config["system"]
+        user_suffix = dialect_config["user_suffix"]
+
         # Build schema context
         schema_context = await self.build_schema_context(db_name)
 
         # Build the prompt
-        system_prompt = """You are a SQL expert assistant. Your task is to generate PostgreSQL SELECT queries based on natural language descriptions.
-
-RULES:
-1. ONLY generate SELECT queries. Never generate INSERT, UPDATE, DELETE, or DDL statements.
-2. Always use proper PostgreSQL syntax.
-3. Use table aliases for readability.
-4. Add appropriate LIMIT clause if not specified (default: 100).
-5. Use schema-qualified table names when available (e.g., public.users).
-6. Handle NULL values appropriately.
-7. Use proper JOIN syntax when relating tables.
-
-OUTPUT FORMAT:
-Return a JSON object with two fields:
-- "sql": The generated SQL query
-- "explanation": A brief explanation of what the query does (in Chinese)
-
-Example output:
-{"sql": "SELECT * FROM public.users WHERE age > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户"}
-"""
-
         user_prompt = f"""Schema Information:
 {schema_context}
 
 User Request: {prompt}
 
-Generate a PostgreSQL SELECT query for this request. Return ONLY the JSON object with "sql" and "explanation" fields."""
+{user_suffix} Return ONLY the JSON object with "sql" and "explanation" fields."""
 
         try:
             response = self.client.chat.completions.create(
@@ -188,4 +226,3 @@ Generate a PostgreSQL SELECT query for this request. Return ONLY the JSON object
 
 # Global instance
 llm_service = LLMService()
-

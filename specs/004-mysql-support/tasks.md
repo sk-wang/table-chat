@@ -62,8 +62,8 @@
 - [ ] T015 [US1] 实现 MySQLConnector.test_connection() 方法（10 秒超时）
 - [ ] T016 [US1] 实现 MySQLConnector._parse_url() 解析 mysql:// 连接字符串
 - [ ] T017 [US1] 实现 MySQLConnector.get_dialect() 返回 "mysql"
-- [ ] T018 [US1] 更新 backend/app/connectors/factory.py 注册 MySQLConnector
-- [ ] T019 [US1] 创建 backend/tests/test_services/test_mysql_connector.py 测试连接功能
+- [x] T018 [US1] 更新 backend/app/connectors/factory.py 注册 MySQLConnector
+- [x] T019 [US1] 创建 backend/tests/test_services/test_mysql_connector.py 测试连接功能
 
 **Checkpoint**: 可以成功添加和验证 MySQL 数据库连接
 
@@ -77,11 +77,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T020 [US2] 实现 MySQLConnector.fetch_metadata() 使用 INFORMATION_SCHEMA 提取元数据
-- [ ] T021 [US2] 实现 MySQL 表/视图查询（过滤系统 schema）
-- [ ] T022 [US2] 实现 MySQL 列信息查询（包含 COLUMN_COMMENT）
-- [ ] T023 [US2] 实现 MySQL 主键识别（COLUMN_KEY = 'PRI'）
-- [ ] T024 [US2] 添加 MySQL 元数据提取单元测试到 backend/tests/test_services/test_mysql_connector.py
+- [x] T020 [US2] 实现 MySQLConnector.fetch_metadata() 使用 INFORMATION_SCHEMA 提取元数据
+- [x] T021 [US2] 实现 MySQL 表/视图查询（过滤系统 schema）
+- [x] T022 [US2] 实现 MySQL 列信息查询（包含 COLUMN_COMMENT）
+- [x] T023 [US2] 实现 MySQL 主键识别（COLUMN_KEY = 'PRI'）
+- [x] T024 [US2] 添加 MySQL 元数据提取单元测试到 backend/tests/test_services/test_mysql_connector.py
 
 **Checkpoint**: 可以浏览 MySQL 数据库的完整元数据
 
@@ -95,11 +95,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] 实现 MySQLConnector.execute_query() 方法
-- [ ] T026 [US3] 实现 MySQL 结果集序列化（处理日期、bytes 等类型）
-- [ ] T027 [US3] 更新 backend/app/services/query_service.py 使用 connector.get_dialect() 进行 SQL 解析
-- [ ] T028 [US3] 验证 sqlglot MySQL 方言的 LIMIT 注入逻辑
-- [ ] T029 [US3] 添加 MySQL 查询执行单元测试到 backend/tests/test_services/test_mysql_connector.py
+- [x] T025 [US3] 实现 MySQLConnector.execute_query() 方法
+- [x] T026 [US3] 实现 MySQL 结果集序列化（处理日期、bytes 等类型）
+- [x] T027 [US3] 更新 backend/app/services/query_service.py 使用 connector.get_dialect() 进行 SQL 解析
+- [x] T028 [US3] 验证 sqlglot MySQL 方言的 LIMIT 注入逻辑
+- [x] T029 [US3] 添加 MySQL 查询执行单元测试到 backend/tests/test_services/test_mysql_connector.py
 
 **Checkpoint**: 可以对 MySQL 执行 SELECT 查询并查看结果
 
@@ -113,10 +113,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] 更新 backend/app/services/llm_service.py 添加数据库类型参数
-- [ ] T031 [US4] 更新 LLM 系统提示支持 MySQL 语法（根据 db_type 动态选择）
-- [ ] T032 [US4] 更新 backend/app/api/v1/query.py 传递 db_type 给 llm_service
-- [ ] T033 [US4] 添加 MySQL 自然语言生成测试
+- [x] T030 [US4] 更新 backend/app/services/llm_service.py 添加数据库类型参数
+- [x] T031 [US4] 更新 LLM 系统提示支持 MySQL 语法（根据 db_type 动态选择）
+- [x] T032 [US4] 更新 backend/app/api/v1/query.py 传递 db_type 给 llm_service
+- [x] T033 [US4] 添加 MySQL 自然语言生成测试
 
 **Checkpoint**: 自然语言查询可以生成正确的 MySQL SELECT 语句
 
@@ -130,9 +130,9 @@
 
 ### Implementation for Frontend
 
-- [ ] T034 [P] 更新 frontend/src/types/index.ts 添加 dbType 字段到 Database 接口
-- [ ] T035 [P] 更新 frontend/src/components/sidebar/DatabaseSidebar.tsx 显示数据库类型图标
-- [ ] T036 添加 MySQL/PostgreSQL 图标资源或使用 Ant Design 图标
+- [x] T034 [P] 更新 frontend/src/types/index.ts 添加 dbType 字段到 Database 接口
+- [x] T035 [P] 更新 frontend/src/components/sidebar/DatabaseSidebar.tsx 显示数据库类型图标
+- [x] T036 添加 MySQL/PostgreSQL 图标资源或使用 Ant Design 图标
 
 **Checkpoint**: 前端正确显示数据库类型
 

@@ -217,3 +217,64 @@ class TestLLMService:
 
             with pytest.raises(ValueError, match="LLM generation failed"):
                 await service.generate_sql("testdb", "test")
+
+    @pytest.mark.asyncio
+    async def test_generate_sql_mysql_dialect(self, service):
+        """Test generate_sql uses MySQL dialect when db_type is mysql."""
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='{"sql": "SELECT * FROM `users` WHERE `id` = 1", "explanation": "查询用户1"}'
+                )
+            )
+        ]
+
+        with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_schema.return_value = "Schema info"
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            # Call with mysql dialect
+            sql, explanation = await service.generate_sql("testdb", "查询用户1", db_type="mysql")
+
+            assert sql == "SELECT * FROM `users` WHERE `id` = 1"
+            assert explanation == "查询用户1"
+
+            # Verify the MySQL prompt was used
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs.get("messages", [])
+            system_message = messages[0]["content"] if messages else ""
+            assert "MySQL" in system_message
+            assert "`users`" in system_message or "backtick" in system_message.lower()
+
+    @pytest.mark.asyncio
+    async def test_generate_sql_postgresql_dialect(self, service):
+        """Test generate_sql uses PostgreSQL dialect when db_type is postgresql."""
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='{"sql": "SELECT * FROM public.users WHERE id = 1", "explanation": "查询用户1"}'
+                )
+            )
+        ]
+
+        with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_schema.return_value = "Schema info"
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            # Call with postgresql dialect (default)
+            sql, explanation = await service.generate_sql("testdb", "查询用户1", db_type="postgresql")
+
+            assert sql == "SELECT * FROM public.users WHERE id = 1"
+            assert explanation == "查询用户1"
+
+            # Verify the PostgreSQL prompt was used
+            call_args = mock_client.chat.completions.create.call_args
+            messages = call_args.kwargs.get("messages", [])
+            system_message = messages[0]["content"] if messages else ""
+            assert "PostgreSQL" in system_message

@@ -123,6 +123,7 @@ async def natural_language_query(
         generated_sql, explanation = await llm_service.generate_sql(
             db_name=name,
             prompt=request.prompt,
+            db_type=db_info.get("db_type", "postgresql"),
         )
 
         return NaturalQueryResponse(

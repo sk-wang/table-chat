@@ -23,12 +23,26 @@ describe('Type Definitions', () => {
       const database: DatabaseResponse = {
         name: 'testdb',
         url: 'postgresql://localhost/testdb',
+        dbType: 'postgresql',
         createdAt: '2024-01-01T00:00:00',
         updatedAt: '2024-01-01T00:00:00',
       };
 
       expect(database.name).toBe('testdb');
       expect(database.url).toContain('postgresql://');
+      expect(database.dbType).toBe('postgresql');
+    });
+
+    it('should support mysql database type', () => {
+      const database: DatabaseResponse = {
+        name: 'mysqldb',
+        url: 'mysql://localhost/testdb',
+        dbType: 'mysql',
+        createdAt: '2024-01-01T00:00:00',
+        updatedAt: '2024-01-01T00:00:00',
+      };
+
+      expect(database.dbType).toBe('mysql');
     });
   });
 

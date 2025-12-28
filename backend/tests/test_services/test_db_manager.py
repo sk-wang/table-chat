@@ -99,14 +99,20 @@ class TestDatabaseManager:
     async def test_create_or_update_database_tests_connection(self, manager):
         """Test that create_or_update tests connection first."""
         with patch("app.services.db_manager.db_manager") as mock_db, \
-             patch.object(manager, "test_connection", new_callable=AsyncMock) as mock_test:
-            
+             patch("app.services.db_manager.ConnectorFactory") as mock_factory:
+
+            # Setup mocks
+            mock_connector = AsyncMock()
+            mock_factory.get_connector.return_value = mock_connector
+            mock_factory.detect_db_type.return_value = "postgresql"
+
             mock_db.create_or_update_database = AsyncMock(return_value={
                 "name": "testdb",
                 "url": "postgresql://localhost/testdb",
+                "db_type": "postgresql",
             })
-            
+
             await manager.create_or_update_database("testdb", "postgresql://localhost/testdb")
-            
-            mock_test.assert_called_once_with("postgresql://localhost/testdb")
-            mock_db.create_or_update_database.assert_called_once()
+
+            mock_connector.test_connection.assert_called_once()
+            mock_db.create_or_update_database.assert_called_once_with("testdb", "postgresql://localhost/testdb", "postgresql")

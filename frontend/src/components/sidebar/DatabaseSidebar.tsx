@@ -27,6 +27,25 @@ import { apiClient } from '../../services/api';
 import type { TableMetadata } from '../../types/metadata';
 import { TableSearchInput } from './TableSearchInput';
 
+// Database type configuration
+const DB_TYPE_CONFIG = {
+  postgresql: {
+    icon: <DatabaseOutlined style={{ color: '#336791' }} />,
+    label: 'PostgreSQL',
+    bgColor: '#336791',
+  },
+  mysql: {
+    icon: <DatabaseOutlined style={{ color: '#4479A1' }} />,
+    label: 'MySQL',
+    bgColor: '#4479A1',
+  },
+} as const;
+
+// Helper to get database type info
+const getDbTypeInfo = (dbType: string | undefined) => {
+  return DB_TYPE_CONFIG[dbType as keyof typeof DB_TYPE_CONFIG] || DB_TYPE_CONFIG.postgresql;
+};
+
 interface DatabaseSidebarProps {
   metadata: TableMetadata[] | null;
   metadataLoading: boolean;
@@ -307,22 +326,28 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                   }
                 }}
               >
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: 6, 
-                  overflow: 'hidden', 
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  overflow: 'hidden',
                   flex: 1,
                   minWidth: 0,
                 }}>
-                  <DatabaseOutlined style={{ 
-                    color: selectedDatabase === db.name ? '#589df6' : '#6897bb',
-                    flexShrink: 0,
-                    fontSize: 12,
-                  }} />
-                  <Text 
+                  {/* Database type indicator with color */}
+                  <div
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: getDbTypeInfo(db.dbType).bgColor,
+                      flexShrink: 0,
+                    }}
+                    title={getDbTypeInfo(db.dbType).label}
+                  />
+                  <Text
                     ellipsis={{ tooltip: db.name }}
-                    style={{ 
+                    style={{
                       color: selectedDatabase === db.name ? '#fff' : '#a9b7c6',
                       fontSize: 12,
                       overflow: 'hidden',
@@ -334,6 +359,19 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                   >
                     {db.name}
                   </Text>
+                  {/* Database type badge */}
+                  <span
+                    style={{
+                      fontSize: 9,
+                      color: getDbTypeInfo(db.dbType).bgColor,
+                      background: 'rgba(255,255,255,0.1)',
+                      padding: '1px 4px',
+                      borderRadius: 3,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {getDbTypeInfo(db.dbType).label.toUpperCase()}
+                  </span>
                 </div>
                 <Popconfirm
                   title="Delete connection?"

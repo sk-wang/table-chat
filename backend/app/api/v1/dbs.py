@@ -32,6 +32,7 @@ async def list_databases() -> DatabaseListResponse:
         DatabaseResponse(
             name=db["name"],
             url=mask_password_in_url(db["url"]),
+            db_type=db.get("db_type", "postgresql"),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )
@@ -62,6 +63,7 @@ async def get_database(name: str) -> DatabaseResponse:
     return DatabaseResponse(
         name=db["name"],
         url=mask_password_in_url(db["url"]),
+        db_type=db.get("db_type", "postgresql"),
         created_at=datetime.fromisoformat(db["created_at"]),
         updated_at=datetime.fromisoformat(db["updated_at"]),
     )
@@ -82,7 +84,7 @@ async def get_database_metadata(
 ) -> DatabaseMetadata:
     """
     Get database metadata including tables, views, and columns.
-    
+
     - Returns cached metadata by default
     - Use refresh=true to force fetching fresh metadata from database
     """
@@ -119,7 +121,7 @@ async def get_database_metadata(
     summary="Refresh database metadata",
 )
 async def refresh_database_metadata(name: str) -> DatabaseMetadata:
-    """Force refresh database metadata from PostgreSQL."""
+    """Force refresh database metadata from database."""
     # First verify the database exists
     db = await database_manager.get_database(name)
     if not db:
@@ -169,6 +171,7 @@ async def create_or_update_database(
         return DatabaseResponse(
             name=db["name"],
             url=mask_password_in_url(db["url"]),
+            db_type=db.get("db_type", "postgresql"),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )
@@ -206,4 +209,3 @@ async def delete_database(name: str) -> None:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Database '{name}' not found",
         )
-

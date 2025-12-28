@@ -20,6 +20,7 @@ export type { ColumnInfo, TableMetadata, DatabaseMetadata } from './metadata';
 export interface DatabaseResponse {
   name: string;
   url: string;
+  dbType: 'postgresql' | 'mysql';
   createdAt: string;
   updatedAt: string;
 }

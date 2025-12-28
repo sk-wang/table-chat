@@ -10,7 +10,7 @@ from app.models.base import CamelModel
 class DatabaseCreateRequest(CamelModel):
     """Request model for creating/updating a database connection."""
 
-    url: str = Field(..., description="PostgreSQL connection URL")
+    url: str = Field(..., description="Database connection URL (postgresql:// or mysql://)")
 
 
 class DatabaseResponse(CamelModel):
@@ -18,6 +18,7 @@ class DatabaseResponse(CamelModel):
 
     name: str
     url: str  # Masked in actual responses
+    db_type: str  # 'postgresql' or 'mysql'
     created_at: datetime
     updated_at: datetime
 
@@ -44,4 +45,3 @@ def mask_password_in_url(url: str) -> str:
         return url
     except Exception:
         return url
-

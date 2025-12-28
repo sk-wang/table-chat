@@ -52,12 +52,14 @@ class TestDatabaseModels:
         response = DatabaseResponse(
             name="testdb",
             url="postgresql://localhost/testdb",
+            db_type="postgresql",
             created_at="2024-01-01T00:00:00",
             updated_at="2024-01-01T00:00:00",
         )
-        
+
         json_data = json.loads(response.model_dump_json(by_alias=True))
         assert json_data["name"] == "testdb"
+        assert json_data["dbType"] == "postgresql"
         assert json_data["createdAt"] == "2024-01-01T00:00:00"
         assert json_data["updatedAt"] == "2024-01-01T00:00:00"
 

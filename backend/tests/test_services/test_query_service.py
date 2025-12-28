@@ -85,27 +85,6 @@ class TestQueryService:
         assert "OFFSET 20" in modified_sql
         assert truncated is True
 
-    def test_serialize_value_none(self):
-        """Test serializing None value."""
-        assert query_service._serialize_value(None) is None
-
-    def test_serialize_value_string(self):
-        """Test serializing string value."""
-        assert query_service._serialize_value("test") == "test"
-
-    def test_serialize_value_int(self):
-        """Test serializing int value."""
-        assert query_service._serialize_value(123) == 123
-
-    def test_serialize_value_bytes(self):
-        """Test serializing bytes value."""
-        assert query_service._serialize_value(b"test") == "test"
-
-    def test_serialize_value_bytes_non_utf8(self):
-        """Test serializing non-UTF8 bytes."""
-        result = query_service._serialize_value(b"\xff\xfe")
-        assert isinstance(result, str)
-
 
 @pytest.mark.asyncio
 class TestQueryServiceAsync:
