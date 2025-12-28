@@ -67,3 +67,54 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--jetbrains-text-muted);
 }
+
+/* JetBrains style Collapse panels */
+.ant-collapse {
+  background: transparent !important;
+  border: none !important;
+}
+
+.ant-collapse > .ant-collapse-item {
+  border: none !important;
+  background: transparent !important;
+}
+
+.ant-collapse > .ant-collapse-item > .ant-collapse-header {
+  padding: 8px 12px !important;
+  background: #313335 !important;
+  border-bottom: 1px solid var(--jetbrains-border) !important;
+  color: var(--jetbrains-text) !important;
+  align-items: center !important;
+}
+
+.ant-collapse > .ant-collapse-item > .ant-collapse-header:hover {
+  background: #3c3f41 !important;
+}
+
+.ant-collapse > .ant-collapse-item > .ant-collapse-content {
+  background: transparent !important;
+  border: none !important;
+}
+
+.ant-collapse > .ant-collapse-item > .ant-collapse-content > .ant-collapse-content-box {
+  padding: 0 12px !important;
+  background: #3c3f41 !important;
+}
+
+/* Tree component in sidebar */
+.ant-tree {
+  background: transparent !important;
+  color: var(--jetbrains-text) !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper {
+  color: var(--jetbrains-text) !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper:hover {
+  background: #45494a !important;
+}
+
+.ant-tree .ant-tree-node-content-wrapper.ant-tree-node-selected {
+  background: #4e5254 !important;
+}

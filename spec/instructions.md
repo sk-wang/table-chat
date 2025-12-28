@@ -57,3 +57,18 @@ POST /api/v1/dbs/{name}/query/natural
     "prompt":"show me all the tables in this database"
 }
 ```
+
+## 侧边栏
+侧边栏目前用途不大，可以放所有已有的数据库，并且把添加数据库，删除已有数据库的功能放在侧边栏，侧边栏也要使用jetbrains ide的风格。然后主页直接显示第一个数据库的metadata信息和查询界面，这样用户可以减少一次点击进入到database display页面。一个页面囊括所有功能。
+
+
+## 分析代码
+/speckit.analyze 仔细review 当前代码库的代码，删除不用的代码，添加更多unit test，以及寻找opportunity
+
+## 注释
+字段注释和表注释，要在合适的地方显示，比如查询结构，表结构树中。
+
+
+
+## 添加MySQL db支持
+参考backend中的postgresSQL实现，实现Mysql的metadata提取和查询支持，同时自然语言生成也支持MySQL.目前我本地有一个mysql 

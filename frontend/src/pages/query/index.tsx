@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { Typography, Alert, Spin, Tabs, message, Layout } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Typography, Alert, Tabs, message, Layout } from 'antd';
 import { CodeOutlined, RobotOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
-import { SchemaTree } from '../../components/schema/SchemaTree';
+import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import type { QueryResult } from '../../types';
+import type { TableMetadata } from '../../types/metadata';
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -17,8 +18,13 @@ type QueryMode = 'sql' | 'natural';
 
 export const QueryPage: React.FC = () => {
   // Use global database context
-  const { databases, selectedDatabase, setSelectedDatabase, loading: loadingDatabases } = useDatabase();
+  const { databases, selectedDatabase, loading: loadingDatabases } = useDatabase();
   
+  // Metadata state
+  const [metadata, setMetadata] = useState<TableMetadata[] | null>(null);
+  const [metadataLoading, setMetadataLoading] = useState(false);
+  
+  // Query state
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM ');
   const [result, setResult] = useState<QueryResult | null>(null);
   const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>();
@@ -28,6 +34,51 @@ export const QueryPage: React.FC = () => {
   const [queryMode, setQueryMode] = useState<QueryMode>('sql');
   const [llmUnavailable, setLlmUnavailable] = useState(false);
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
+
+  // Load metadata when database changes
+  useEffect(() => {
+    if (!selectedDatabase) {
+      setMetadata(null);
+      return;
+    }
+
+    const loadMetadata = async () => {
+      try {
+        setMetadataLoading(true);
+        const response = await apiClient.getDatabaseMetadata(selectedDatabase);
+        setMetadata(response.tables || []);
+      } catch (err) {
+        console.error('Failed to load metadata:', err);
+        setMetadata([]);
+      } finally {
+        setMetadataLoading(false);
+      }
+    };
+
+    loadMetadata();
+  }, [selectedDatabase]);
+
+  const handleRefreshMetadata = async () => {
+    if (!selectedDatabase) return;
+    
+    try {
+      setMetadataLoading(true);
+      const response = await apiClient.refreshDatabaseMetadata(selectedDatabase);
+      setMetadata(response.tables || []);
+      message.success('Schema refreshed');
+    } catch (err) {
+      message.error('Failed to refresh schema');
+    } finally {
+      setMetadataLoading(false);
+    }
+  };
+
+  const handleTableSelect = (schemaName: string, tableName: string) => {
+    const sql = `SELECT * FROM ${schemaName}.${tableName} LIMIT 100`;
+    setSqlQuery(sql);
+    setQueryMode('sql');
+    message.info(`Generated SELECT for ${tableName}`);
+  };
 
   const handleExecute = async () => {
     if (!selectedDatabase || !sqlQuery.trim()) {
@@ -104,30 +155,39 @@ export const QueryPage: React.FC = () => {
     }
   };
 
-  const handleGenerateSelectFromTree = (sql: string) => {
-    setSqlQuery(sql);
-    setQueryMode('sql');
-    message.info('SELECT 语句已生成');
-  };
-
-  if (loadingDatabases) {
+  // Show welcome message if no databases
+  if (!loadingDatabases && databases.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: 48 }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (databases.length === 0) {
-    return (
-      <div style={{ padding: 24 }}>
-        <Alert
-          message="No Databases Configured"
-          description="Please add a database connection in the Databases page before running queries."
-          type="info"
-          showIcon
-        />
-      </div>
+      <Layout style={{ height: '100%', background: 'transparent' }}>
+        <Sider
+          width={280}
+          style={{
+            background: '#3c3f41',
+            borderRight: '1px solid #323232',
+            overflow: 'hidden',
+          }}
+        >
+          <DatabaseSidebar
+            metadata={null}
+            metadataLoading={false}
+          />
+        </Sider>
+        <Content style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          background: '#2b2b2b',
+        }}>
+          <div style={{ textAlign: 'center', padding: 48 }}>
+            <Title level={3} style={{ color: '#a9b7c6' }}>
+              Welcome to TableChat
+            </Title>
+            <Text style={{ color: '#808080', fontSize: 14 }}>
+              Add a database connection in the sidebar to get started.
+            </Text>
+          </div>
+        </Content>
+      </Layout>
     );
   }
 
@@ -169,41 +229,47 @@ export const QueryPage: React.FC = () => {
 
   return (
     <Layout style={{ height: '100%', background: 'transparent' }}>
-      {/* Schema Browser Sidebar */}
+      {/* Database & Schema Sidebar */}
       <Sider
         width={280}
         style={{
-          background: '#2b2b2b',
-          borderRight: '1px solid #3c3f41',
+          background: '#3c3f41',
+          borderRight: '1px solid #323232',
           overflow: 'hidden',
         }}
       >
-        <SchemaTree
-          databaseName={selectedDatabase}
-          onGenerateSelect={handleGenerateSelectFromTree}
+        <DatabaseSidebar
+          metadata={metadata}
+          metadataLoading={metadataLoading}
+          onTableSelect={handleTableSelect}
+          onRefreshMetadata={handleRefreshMetadata}
         />
       </Sider>
 
       {/* Main Query Area */}
-      <Content style={{ padding: 24, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Title level={2} style={{ margin: 0, marginBottom: 24, color: '#a9b7c6' }}>
-          SQL Query
-        </Title>
-
+      <Content style={{ 
+        padding: 16, 
+        display: 'flex', 
+        flexDirection: 'column', 
+        overflow: 'hidden',
+        background: '#2b2b2b',
+      }}>
+        {/* Toolbar */}
         <QueryToolbar
           databases={databases}
           selectedDatabase={selectedDatabase}
-          onDatabaseChange={setSelectedDatabase}
           onExecute={handleExecute}
           onClear={handleClear}
           executing={executing}
+          showDatabaseSelector={false}
         />
 
+        {/* Editor Tabs */}
         <Tabs
           activeKey={queryMode}
           onChange={(key) => setQueryMode(key as QueryMode)}
           items={tabItems}
-          style={{ marginBottom: 16 }}
+          style={{ marginBottom: 8 }}
         />
 
         {/* Show generated explanation if available */}
@@ -224,7 +290,7 @@ export const QueryPage: React.FC = () => {
             icon={<RobotOutlined />}
             closable
             onClose={() => setGeneratedExplanation(null)}
-            style={{ marginBottom: 16, background: '#2d3436', borderColor: '#80CBC4' }}
+            style={{ marginBottom: 12, background: '#2d3436', borderColor: '#80CBC4' }}
           />
         )}
 
@@ -236,10 +302,11 @@ export const QueryPage: React.FC = () => {
             showIcon
             closable
             onClose={() => setError(null)}
-            style={{ marginBottom: 16 }}
+            style={{ marginBottom: 12 }}
           />
         )}
 
+        {/* Results */}
         <div style={{ flex: 1, overflow: 'auto' }}>
           <QueryResultTable
             result={result}

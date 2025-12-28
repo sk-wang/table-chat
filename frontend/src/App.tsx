@@ -1,12 +1,11 @@
 import { Refine } from '@refinedev/core';
 import { useNotificationProvider } from '@refinedev/antd';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp, theme } from 'antd';
 
 import { dataProvider } from './providers/data-provider';
 import { DatabaseProvider } from './contexts/DatabaseContext';
 import { MainLayout } from './components/layout/MainLayout';
-import { DatabasesListPage } from './pages/databases/list';
 import { QueryPage } from './pages/query';
 
 import '@refinedev/antd/dist/reset.css';
@@ -57,9 +56,9 @@ function App() {
           >
             <Routes>
               <Route element={<MainLayout />}>
-                <Route index element={<Navigate to="/databases" replace />} />
-                <Route path="/databases" element={<DatabasesListPage />} />
-                <Route path="/query" element={<QueryPage />} />
+                {/* Single page app - main page is the query interface */}
+                <Route index element={<QueryPage />} />
+                <Route path="*" element={<QueryPage />} />
               </Route>
             </Routes>
             </Refine>

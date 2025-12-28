@@ -8,11 +8,12 @@ const { Text } = Typography;
 interface QueryToolbarProps {
   databases: DatabaseResponse[];
   selectedDatabase: string | null;
-  onDatabaseChange: (dbName: string) => void;
+  onDatabaseChange?: (dbName: string) => void;
   onExecute: () => void;
   onClear: () => void;
   executing?: boolean;
   disabled?: boolean;
+  showDatabaseSelector?: boolean;
 }
 
 export const QueryToolbar: React.FC<QueryToolbarProps> = ({
@@ -23,22 +24,32 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
   onClear,
   executing = false,
   disabled = false,
+  showDatabaseSelector = true,
 }) => {
   return (
-    <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+    <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
       <Space>
-        <Text style={{ color: '#a9b7c6' }}>Database:</Text>
-        <Select
-          value={selectedDatabase}
-          onChange={onDatabaseChange}
-          style={{ width: 200 }}
-          placeholder="Select database"
-          disabled={disabled || databases.length === 0}
-          options={databases.map(db => ({
-            label: db.name,
-            value: db.name,
-          }))}
-        />
+        {showDatabaseSelector && onDatabaseChange && (
+          <>
+            <Text style={{ color: '#a9b7c6' }}>Database:</Text>
+            <Select
+              value={selectedDatabase}
+              onChange={onDatabaseChange}
+              style={{ width: 200 }}
+              placeholder="Select database"
+              disabled={disabled || databases.length === 0}
+              options={databases.map(db => ({
+                label: db.name,
+                value: db.name,
+              }))}
+            />
+          </>
+        )}
+        {!showDatabaseSelector && selectedDatabase && (
+          <Text style={{ color: '#589df6', fontWeight: 500 }}>
+            {selectedDatabase}
+          </Text>
+        )}
       </Space>
 
       <Space>
@@ -64,4 +75,3 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
     </Space>
   );
 };
-
