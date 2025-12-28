@@ -1,40 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button, Space, Typography, Spin, Alert } from 'antd';
 import { PlusOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { DatabaseList } from '../../components/database/DatabaseList';
 import { AddDatabaseModal } from '../../components/database/AddDatabaseModal';
+import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import type { DatabaseResponse } from '../../types';
 
 const { Title } = Typography;
 
 export const DatabasesListPage: React.FC = () => {
-  const [databases, setDatabases] = useState<DatabaseResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use global database context
+  const { databases, loading, error: contextError, refreshDatabases, setSelectedDatabase } = useDatabase();
+  const navigate = useNavigate();
+  
+  const [localError, setLocalError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDatabase, setEditingDatabase] = useState<DatabaseResponse | null>(null);
 
-  const loadDatabases = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await apiClient.listDatabases();
-      setDatabases(response.databases);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load databases');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDatabases();
-  }, []);
+  const error = localError || contextError;
 
   const handleDelete = async (name: string) => {
-    await apiClient.deleteDatabase(name);
-    await loadDatabases();
+    try {
+      await apiClient.deleteDatabase(name);
+      await refreshDatabases(); // Refresh global state
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Failed to delete database');
+    }
   };
 
   const handleEdit = (database: DatabaseResponse) => {
@@ -43,8 +36,9 @@ export const DatabasesListPage: React.FC = () => {
   };
 
   const handleSelect = (database: DatabaseResponse) => {
-    // TODO: Navigate to query page with selected database
-    console.log('Selected database:', database.name);
+    // Select database and navigate to query page
+    setSelectedDatabase(database.name);
+    navigate('/query');
   };
 
   const handleModalClose = () => {
@@ -53,7 +47,7 @@ export const DatabasesListPage: React.FC = () => {
   };
 
   const handleModalSuccess = () => {
-    loadDatabases();
+    refreshDatabases(); // Refresh global state
   };
 
   if (loading && databases.length === 0) {
@@ -74,7 +68,7 @@ export const DatabasesListPage: React.FC = () => {
           <Space>
             <Button
               icon={<ReloadOutlined />}
-              onClick={loadDatabases}
+              onClick={() => refreshDatabases()}
               loading={loading}
               style={{ background: '#3c3f41', borderColor: '#323232', color: '#a9b7c6' }}
             >
@@ -98,7 +92,7 @@ export const DatabasesListPage: React.FC = () => {
             type="error"
             showIcon
             closable
-            onClose={() => setError(null)}
+            onClose={() => setLocalError(null)}
           />
         )}
 

@@ -153,20 +153,20 @@
 
 ### Backend - US4
 
-- [ ] T060 [P] [US4] Create TableMetadata/ColumnInfo models in `backend/app/models/metadata.py`
-- [ ] T061 [US4] Implement PostgreSQL metadata extraction (information_schema) in `backend/app/services/metadata_service.py`
-- [ ] T062 [US4] Implement metadata caching to SQLite in `backend/app/services/metadata_service.py`
-- [ ] T063 [US4] Create GET /api/v1/dbs/{name} endpoint (with metadata) in `backend/app/api/v1/dbs.py`
-- [ ] T064 [US4] Implement metadata refresh on connection in `backend/app/services/metadata_service.py`
-- [ ] T065 [US4] Add metadata fetch error handling in `backend/app/api/v1/dbs.py`
+- [x] T060 [P] [US4] Create TableMetadata/ColumnInfo models in `backend/app/models/metadata.py`
+- [x] T061 [US4] Implement PostgreSQL metadata extraction (information_schema) in `backend/app/services/metadata_service.py`
+- [x] T062 [US4] Implement metadata caching to SQLite in `backend/app/services/metadata_service.py`
+- [x] T063 [US4] Create GET /api/v1/dbs/{name} endpoint (with metadata) in `backend/app/api/v1/dbs.py`
+- [x] T064 [US4] Implement metadata refresh on connection in `backend/app/services/metadata_service.py`
+- [x] T065 [US4] Add metadata fetch error handling in `backend/app/api/v1/dbs.py`
 
 ### Frontend - US4
 
-- [ ] T066 [P] [US4] Create SchemaTree component in `frontend/src/components/schema/SchemaTree.tsx`
-- [ ] T067 [P] [US4] Create TableDetail component in `frontend/src/components/schema/TableDetail.tsx`
-- [ ] T068 [US4] Add schema browser sidebar to query page in `frontend/src/pages/query/index.tsx`
-- [ ] T069 [US4] Implement table click to generate SELECT in `frontend/src/components/schema/SchemaTree.tsx`
-- [ ] T070 [US4] Add metadata loading/error states in `frontend/src/components/schema/SchemaTree.tsx`
+- [x] T066 [P] [US4] Create SchemaTree component in `frontend/src/components/schema/SchemaTree.tsx`
+- [x] T067 [P] [US4] Create TableDetail component in `frontend/src/components/schema/TableDetail.tsx`
+- [x] T068 [US4] Add schema browser sidebar to query page in `frontend/src/pages/query/index.tsx`
+- [x] T069 [US4] Implement table click to generate SELECT in `frontend/src/components/schema/SchemaTree.tsx`
+- [x] T070 [US4] Add metadata loading/error states in `frontend/src/components/schema/SchemaTree.tsx`
 
 **Checkpoint**: User Story 4 完成 - Schema 浏览器可用
 
@@ -176,13 +176,15 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T071 [P] Add keyboard shortcut (Ctrl+Enter) to execute query in `frontend/src/components/editor/SqlEditor.tsx`
-- [ ] T072 [P] Add connection timeout handling in `backend/app/services/db_manager.py`
-- [ ] T073 [P] Add query execution time display in `frontend/src/components/results/QueryResultTable.tsx`
-- [ ] T074 Implement database selector dropdown in header in `frontend/src/components/layout/MainLayout.tsx`
-- [ ] T075 Add password masking in connection URL display in `backend/app/models/database.py`
-- [ ] T076 [P] Create README.md with setup instructions in project root
-- [ ] T077 Run quickstart.md validation
+- [x] T071 [P] Add keyboard shortcut (Ctrl+Enter) to execute query in `frontend/src/components/editor/SqlEditor.tsx`
+- [x] T072 [P] Add connection timeout handling in `backend/app/services/db_manager.py`
+- [x] T073 [P] Add query execution time display in `frontend/src/components/results/QueryResultTable.tsx`
+- [x] T074 Implement database selector dropdown in header in `frontend/src/components/layout/MainLayout.tsx`
+- [x] T075 Add password masking in connection URL display in `backend/app/models/database.py`
+- [x] T076 [P] Create README.md with setup instructions in project root
+- [x] T077 Run quickstart.md validation
+
+**Checkpoint**: Phase 7 完成 - 所有 Polish 功能已实现
 
 ---
 
@@ -276,5 +278,5 @@ Phase 5 (US3: 自然语言)  Phase 6 (US4: Schema浏览)
 - [Story] label maps task to specific user story for traceability
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
-- Backend 端口: 8000, Frontend 端口: 5173
+- Backend 端口: 7888, Frontend 端口: 5173
 

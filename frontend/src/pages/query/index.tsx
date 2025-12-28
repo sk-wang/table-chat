@@ -1,51 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { Typography, Alert, Spin, Tabs, message } from 'antd';
+import React, { useState } from 'react';
+import { Typography, Alert, Spin, Tabs, message, Layout } from 'antd';
 import { CodeOutlined, RobotOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
+import { SchemaTree } from '../../components/schema/SchemaTree';
+import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
-import type { DatabaseResponse, QueryResult } from '../../types';
+import type { QueryResult } from '../../types';
 
 const { Title, Text } = Typography;
+const { Sider, Content } = Layout;
 
 type QueryMode = 'sql' | 'natural';
 
 export const QueryPage: React.FC = () => {
-  const [databases, setDatabases] = useState<DatabaseResponse[]>([]);
-  const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
+  // Use global database context
+  const { databases, selectedDatabase, setSelectedDatabase, loading: loadingDatabases } = useDatabase();
+  
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM ');
   const [result, setResult] = useState<QueryResult | null>(null);
   const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>();
   const [executing, setExecuting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loadingDatabases, setLoadingDatabases] = useState(true);
   const [queryMode, setQueryMode] = useState<QueryMode>('sql');
   const [llmUnavailable, setLlmUnavailable] = useState(false);
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
-
-  // Load databases on mount
-  useEffect(() => {
-    const loadDatabases = async () => {
-      try {
-        const response = await apiClient.listDatabases();
-        setDatabases(response.databases);
-        
-        // Auto-select first database if available
-        if (response.databases.length > 0 && !selectedDatabase) {
-          setSelectedDatabase(response.databases[0].name);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load databases');
-      } finally {
-        setLoadingDatabases(false);
-      }
-    };
-
-    loadDatabases();
-  }, [selectedDatabase]);
 
   const handleExecute = async () => {
     if (!selectedDatabase || !sqlQuery.trim()) {
@@ -122,6 +104,12 @@ export const QueryPage: React.FC = () => {
     }
   };
 
+  const handleGenerateSelectFromTree = (sql: string) => {
+    setSqlQuery(sql);
+    setQueryMode('sql');
+    message.info('SELECT 语句已生成');
+  };
+
   if (loadingDatabases) {
     return (
       <div style={{ textAlign: 'center', padding: 48 }}>
@@ -180,68 +168,86 @@ export const QueryPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: 24, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Title level={2} style={{ margin: 0, marginBottom: 24, color: '#a9b7c6' }}>
-        SQL Query
-      </Title>
-
-      <QueryToolbar
-        databases={databases}
-        selectedDatabase={selectedDatabase}
-        onDatabaseChange={setSelectedDatabase}
-        onExecute={handleExecute}
-        onClear={handleClear}
-        executing={executing}
-      />
-
-      <Tabs
-        activeKey={queryMode}
-        onChange={(key) => setQueryMode(key as QueryMode)}
-        items={tabItems}
-        style={{ marginBottom: 16 }}
-      />
-
-      {/* Show generated explanation if available */}
-      {generatedExplanation && queryMode === 'sql' && (
-        <Alert
-          message="AI 生成的 SQL"
-          description={
-            <div>
-              <Text style={{ color: '#a9b7c6' }}>{generatedExplanation}</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                请检查生成的查询，确认无误后点击"Execute"执行
-              </Text>
-            </div>
-          }
-          type="info"
-          showIcon
-          icon={<RobotOutlined />}
-          closable
-          onClose={() => setGeneratedExplanation(null)}
-          style={{ marginBottom: 16, background: '#2d3436', borderColor: '#80CBC4' }}
+    <Layout style={{ height: '100%', background: 'transparent' }}>
+      {/* Schema Browser Sidebar */}
+      <Sider
+        width={280}
+        style={{
+          background: '#2b2b2b',
+          borderRight: '1px solid #3c3f41',
+          overflow: 'hidden',
+        }}
+      >
+        <SchemaTree
+          databaseName={selectedDatabase}
+          onGenerateSelect={handleGenerateSelectFromTree}
         />
-      )}
+      </Sider>
 
-      {error && (
-        <Alert
-          message="Query Error"
-          description={error}
-          type="error"
-          showIcon
-          closable
-          onClose={() => setError(null)}
+      {/* Main Query Area */}
+      <Content style={{ padding: 24, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Title level={2} style={{ margin: 0, marginBottom: 24, color: '#a9b7c6' }}>
+          SQL Query
+        </Title>
+
+        <QueryToolbar
+          databases={databases}
+          selectedDatabase={selectedDatabase}
+          onDatabaseChange={setSelectedDatabase}
+          onExecute={handleExecute}
+          onClear={handleClear}
+          executing={executing}
+        />
+
+        <Tabs
+          activeKey={queryMode}
+          onChange={(key) => setQueryMode(key as QueryMode)}
+          items={tabItems}
           style={{ marginBottom: 16 }}
         />
-      )}
 
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <QueryResultTable
-          result={result}
-          executionTimeMs={executionTimeMs}
-          loading={executing}
-        />
-      </div>
-    </div>
+        {/* Show generated explanation if available */}
+        {generatedExplanation && queryMode === 'sql' && (
+          <Alert
+            message="AI 生成的 SQL"
+            description={
+              <div>
+                <Text style={{ color: '#a9b7c6' }}>{generatedExplanation}</Text>
+                <br />
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  请检查生成的查询，确认无误后点击"Execute"执行
+                </Text>
+              </div>
+            }
+            type="info"
+            showIcon
+            icon={<RobotOutlined />}
+            closable
+            onClose={() => setGeneratedExplanation(null)}
+            style={{ marginBottom: 16, background: '#2d3436', borderColor: '#80CBC4' }}
+          />
+        )}
+
+        {error && (
+          <Alert
+            message="Query Error"
+            description={error}
+            type="error"
+            showIcon
+            closable
+            onClose={() => setError(null)}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <QueryResultTable
+            result={result}
+            executionTimeMs={executionTimeMs}
+            loading={executing}
+          />
+        </div>
+      </Content>
+    </Layout>
   );
 };

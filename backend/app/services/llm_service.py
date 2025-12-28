@@ -67,21 +67,17 @@ class LLMService:
                 schema_name = table_info.get("schema_name", "public")
                 table_name = table_info.get("table_name", "unknown")
                 table_type = table_info.get("table_type", "table")
-                columns_json = table_info.get("columns_json", "[]")
-                
-                try:
-                    columns = json.loads(columns_json) if isinstance(columns_json, str) else columns_json
-                except json.JSONDecodeError:
-                    columns = []
+                # Note: get_metadata_for_database already parses columns_json to "columns"
+                columns = table_info.get("columns", [])
 
                 lines.append(f"Table: {schema_name}.{table_name} ({table_type})")
                 lines.append("-" * 40)
                 
                 for col in columns:
                     col_name = col.get("name", "unknown")
-                    col_type = col.get("data_type", "unknown")
-                    is_nullable = col.get("is_nullable", True)
-                    is_pk = col.get("is_primary_key", False)
+                    col_type = col.get("dataType", col.get("data_type", "unknown"))
+                    is_nullable = col.get("isNullable", col.get("is_nullable", True))
+                    is_pk = col.get("isPrimaryKey", col.get("is_primary_key", False))
                     
                     nullable_str = "" if is_nullable else " NOT NULL"
                     pk_str = " PRIMARY KEY" if is_pk else ""

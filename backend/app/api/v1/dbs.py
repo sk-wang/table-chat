@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models.database import (
     DatabaseCreateRequest,
@@ -11,7 +11,9 @@ from app.models.database import (
     mask_password_in_url,
 )
 from app.models.error import ErrorResponse
+from app.models.metadata import DatabaseMetadata
 from app.services.db_manager import database_manager
+from app.services.metadata_service import metadata_service
 
 router = APIRouter(prefix="/dbs", tags=["Databases"])
 
@@ -63,6 +65,82 @@ async def get_database(name: str) -> DatabaseResponse:
         created_at=datetime.fromisoformat(db["created_at"]),
         updated_at=datetime.fromisoformat(db["updated_at"]),
     )
+
+
+@router.get(
+    "/{name}/metadata",
+    response_model=DatabaseMetadata,
+    responses={
+        404: {"model": ErrorResponse, "description": "Database not found"},
+        503: {"model": ErrorResponse, "description": "Failed to fetch metadata"},
+    },
+    summary="Get database metadata (tables, columns)",
+)
+async def get_database_metadata(
+    name: str,
+    refresh: bool = Query(False, description="Force refresh from database"),
+) -> DatabaseMetadata:
+    """
+    Get database metadata including tables, views, and columns.
+    
+    - Returns cached metadata by default
+    - Use refresh=true to force fetching fresh metadata from database
+    """
+    # First verify the database exists
+    db = await database_manager.get_database(name)
+    if not db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Database '{name}' not found",
+        )
+
+    try:
+        metadata = await metadata_service.get_or_refresh_metadata(name, force_refresh=refresh)
+        return metadata
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to fetch metadata: {e}",
+        ) from e
+
+
+@router.post(
+    "/{name}/metadata/refresh",
+    response_model=DatabaseMetadata,
+    responses={
+        404: {"model": ErrorResponse, "description": "Database not found"},
+        503: {"model": ErrorResponse, "description": "Failed to refresh metadata"},
+    },
+    summary="Refresh database metadata",
+)
+async def refresh_database_metadata(name: str) -> DatabaseMetadata:
+    """Force refresh database metadata from PostgreSQL."""
+    # First verify the database exists
+    db = await database_manager.get_database(name)
+    if not db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Database '{name}' not found",
+        )
+
+    try:
+        metadata = await metadata_service.refresh_metadata(name)
+        return metadata
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to refresh metadata: {e}",
+        ) from e
 
 
 @router.put(

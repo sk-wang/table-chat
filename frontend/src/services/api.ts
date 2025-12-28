@@ -10,6 +10,7 @@ import type {
   QueryRequest,
   QueryResponse,
 } from '../types';
+import type { DatabaseMetadata } from '../types/metadata';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888';
 
@@ -90,6 +91,31 @@ class ApiClient {
       const response: AxiosResponse<NaturalQueryResponse> = await this.client.post(
         `/dbs/${dbName}/query/natural`,
         data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  // === Metadata Operations ===
+
+  async getDatabaseMetadata(dbName: string, refresh = false): Promise<DatabaseMetadata> {
+    try {
+      const response: AxiosResponse<DatabaseMetadata> = await this.client.get(
+        `/dbs/${dbName}/metadata`,
+        { params: { refresh } }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async refreshDatabaseMetadata(dbName: string): Promise<DatabaseMetadata> {
+    try {
+      const response: AxiosResponse<DatabaseMetadata> = await this.client.post(
+        `/dbs/${dbName}/metadata/refresh`
       );
       return response.data;
     } catch (error) {

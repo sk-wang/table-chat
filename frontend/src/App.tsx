@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntdApp, theme } from 'antd';
 
 import { dataProvider } from './providers/data-provider';
+import { DatabaseProvider } from './contexts/DatabaseContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { DatabasesListPage } from './pages/databases/list';
 import { QueryPage } from './pages/query';
@@ -36,7 +37,8 @@ function App() {
     <BrowserRouter>
       <ConfigProvider theme={jetbrainsTheme}>
         <AntdApp>
-          <Refine
+          <DatabaseProvider>
+            <Refine
             dataProvider={dataProvider}
             notificationProvider={useNotificationProvider}
             resources={[
@@ -60,7 +62,8 @@ function App() {
                 <Route path="/query" element={<QueryPage />} />
               </Route>
             </Routes>
-          </Refine>
+            </Refine>
+          </DatabaseProvider>
         </AntdApp>
       </ConfigProvider>
     </BrowserRouter>

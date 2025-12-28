@@ -1,91 +1,112 @@
 """Unit tests for db_manager module."""
 
 import pytest
-import aiosqlite
+from unittest.mock import AsyncMock, patch
 
-from app.services.db_manager import database_manager
+from app.services.db_manager import DatabaseManager
 
 
-@pytest.mark.asyncio
 class TestDatabaseManager:
     """Test suite for DatabaseManager."""
 
     @pytest.fixture
-    async def clean_db(self, tmp_path):
-        """Create a clean test database."""
-        db_path = tmp_path / "test.db"
-        async with aiosqlite.connect(db_path) as db:
-            await db.execute("""
-                CREATE TABLE IF NOT EXISTS databases (
-                    name TEXT PRIMARY KEY,
-                    url TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-                )
-            """)
-            await db.commit()
-        
-        # Temporarily override database path
-        original_path = database_manager.db_path
-        database_manager.db_path = db_path
-        
-        yield db_path
-        
-        # Restore original path
-        database_manager.db_path = original_path
+    def manager(self):
+        """Create a fresh DatabaseManager instance."""
+        return DatabaseManager()
 
-    async def test_save_connection(self, clean_db):
-        """Test saving a database connection."""
-        await database_manager.save_connection(
-            "testdb",
-            "postgresql://user:pass@localhost/testdb"
-        )
+    @pytest.mark.asyncio
+    async def test_list_databases(self, manager):
+        """Test listing databases delegates to sqlite manager."""
+        mock_result = [
+            {"name": "db1", "url": "postgresql://localhost/db1"},
+            {"name": "db2", "url": "postgresql://localhost/db2"},
+        ]
         
-        # Verify it was saved
-        url = await database_manager.get_connection("testdb")
-        assert url == "postgresql://user:pass@localhost/testdb"
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.list_databases = AsyncMock(return_value=mock_result)
+            
+            result = await manager.list_databases()
+            
+            assert result == mock_result
+            mock_db.list_databases.assert_called_once()
 
-    async def test_save_connection_update(self, clean_db):
-        """Test updating an existing connection."""
-        await database_manager.save_connection("testdb", "postgresql://old@localhost/db")
-        await database_manager.save_connection("testdb", "postgresql://new@localhost/db")
+    @pytest.mark.asyncio
+    async def test_get_database(self, manager):
+        """Test getting a database by name."""
+        mock_result = {"name": "testdb", "url": "postgresql://localhost/testdb"}
         
-        url = await database_manager.get_connection("testdb")
-        assert url == "postgresql://new@localhost/db"
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.get_database = AsyncMock(return_value=mock_result)
+            
+            result = await manager.get_database("testdb")
+            
+            assert result == mock_result
+            mock_db.get_database.assert_called_once_with("testdb")
 
-    async def test_get_connection_not_found(self, clean_db):
-        """Test getting non-existent connection raises error."""
-        with pytest.raises(ValueError, match="Database 'nonexistent' not found"):
-            await database_manager.get_connection("nonexistent")
+    @pytest.mark.asyncio
+    async def test_get_database_not_found(self, manager):
+        """Test getting non-existent database returns None."""
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.get_database = AsyncMock(return_value=None)
+            
+            result = await manager.get_database("nonexistent")
+            
+            assert result is None
 
-    async def test_list_connections_empty(self, clean_db):
-        """Test listing connections when none exist."""
-        connections = await database_manager.list_connections()
-        assert connections == []
-
-    async def test_list_connections(self, clean_db):
-        """Test listing multiple connections."""
-        await database_manager.save_connection("db1", "postgresql://localhost/db1")
-        await database_manager.save_connection("db2", "postgresql://localhost/db2")
+    @pytest.mark.asyncio
+    async def test_get_connection_returns_url(self, manager):
+        """Test get_connection returns URL string."""
+        mock_db_info = {"name": "testdb", "url": "postgresql://localhost/testdb"}
         
-        connections = await database_manager.list_connections()
-        assert len(connections) == 2
-        
-        names = [conn["name"] for conn in connections]
-        assert "db1" in names
-        assert "db2" in names
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.get_database = AsyncMock(return_value=mock_db_info)
+            
+            url = await manager.get_connection("testdb")
+            
+            assert url == "postgresql://localhost/testdb"
 
-    async def test_delete_connection(self, clean_db):
-        """Test deleting a connection."""
-        await database_manager.save_connection("testdb", "postgresql://localhost/testdb")
-        await database_manager.delete_connection("testdb")
-        
-        # Should not exist anymore
-        with pytest.raises(ValueError, match="Database 'testdb' not found"):
-            await database_manager.get_connection("testdb")
+    @pytest.mark.asyncio
+    async def test_get_connection_not_found_raises(self, manager):
+        """Test get_connection raises ValueError if not found."""
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.get_database = AsyncMock(return_value=None)
+            
+            with pytest.raises(ValueError, match="Database 'nonexistent' not found"):
+                await manager.get_connection("nonexistent")
 
-    async def test_delete_connection_not_found(self, clean_db):
-        """Test deleting non-existent connection raises error."""
-        with pytest.raises(ValueError, match="Database 'nonexistent' not found"):
-            await database_manager.delete_connection("nonexistent")
+    @pytest.mark.asyncio
+    async def test_delete_database(self, manager):
+        """Test deleting a database."""
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.delete_database = AsyncMock(return_value=True)
+            
+            result = await manager.delete_database("testdb")
+            
+            assert result is True
+            mock_db.delete_database.assert_called_once_with("testdb")
 
+    @pytest.mark.asyncio
+    async def test_delete_database_not_found(self, manager):
+        """Test deleting non-existent database returns False."""
+        with patch("app.services.db_manager.db_manager") as mock_db:
+            mock_db.delete_database = AsyncMock(return_value=False)
+            
+            result = await manager.delete_database("nonexistent")
+            
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_create_or_update_database_tests_connection(self, manager):
+        """Test that create_or_update tests connection first."""
+        with patch("app.services.db_manager.db_manager") as mock_db, \
+             patch.object(manager, "test_connection", new_callable=AsyncMock) as mock_test:
+            
+            mock_db.create_or_update_database = AsyncMock(return_value={
+                "name": "testdb",
+                "url": "postgresql://localhost/testdb",
+            })
+            
+            await manager.create_or_update_database("testdb", "postgresql://localhost/testdb")
+            
+            mock_test.assert_called_once_with("postgresql://localhost/testdb")
+            mock_db.create_or_update_database.assert_called_once()

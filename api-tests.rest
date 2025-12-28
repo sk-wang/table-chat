@@ -307,3 +307,23 @@ Content-Type: application/json
   "prompt": "查询用户信息"
 }
 
+################################################################################
+# 数据库 Metadata API (Phase 6)
+################################################################################
+
+### 37. 获取数据库 Metadata
+GET {{baseUrl}}/dbs/testdb/metadata
+Content-Type: application/json
+
+### 38. 强制刷新 Metadata
+GET {{baseUrl}}/dbs/testdb/metadata?refresh=true
+Content-Type: application/json
+
+### 39. 刷新 Metadata (POST)
+POST {{baseUrl}}/dbs/testdb/metadata/refresh
+Content-Type: application/json
+
+### 40. 获取不存在数据库的 Metadata
+GET {{baseUrl}}/dbs/nonexistent/metadata
+Content-Type: application/json
+
