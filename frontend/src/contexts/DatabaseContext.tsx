@@ -27,23 +27,26 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setDatabases(response.databases);
 
       // Auto-select first database if none selected
-      if (response.databases.length > 0 && !selectedDatabase) {
-        setSelectedDatabase(response.databases[0].name);
-      }
-      // Clear selection if selected database no longer exists
-      if (selectedDatabase && !response.databases.find(db => db.name === selectedDatabase)) {
-        setSelectedDatabase(response.databases.length > 0 ? response.databases[0].name : null);
-      }
+      setSelectedDatabase(prev => {
+        if (response.databases.length > 0 && !prev) {
+          return response.databases[0].name;
+        }
+        // Clear selection if selected database no longer exists
+        if (prev && !response.databases.find(db => db.name === prev)) {
+          return response.databases.length > 0 ? response.databases[0].name : null;
+        }
+        return prev;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load databases');
     } finally {
       setLoading(false);
     }
-  }, [selectedDatabase]);
+  }, []); // No dependencies needed - uses setters and state updater functions
 
   useEffect(() => {
     refreshDatabases();
-  }, []);
+  }, [refreshDatabases]); // Include refreshDatabases in dependencies
 
   const value: DatabaseContextValue = {
     databases,

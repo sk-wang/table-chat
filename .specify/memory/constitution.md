@@ -1,18 +1,15 @@
 <!--
 Sync Impact Report
 ==================
-Version change: N/A → 1.0.0 (Initial constitution)
-Modified principles: N/A (new constitution)
+Version change: 1.0.0 → 1.1.0 (MINOR: Added new testing principle)
+Modified principles: None (existing principles unchanged)
 Added sections:
-  - Core Principles (5 principles)
-  - Technology Stack Requirements
-  - Development Workflow
-  - Governance
-Removed sections: N/A
+  - Principle VI: Comprehensive Testing Requirements
+Removed sections: None
 Templates requiring updates:
-  - .specify/templates/plan-template.md: ✅ compatible (Constitution Check section exists)
-  - .specify/templates/spec-template.md: ✅ compatible (no constitution-specific changes needed)
-  - .specify/templates/tasks-template.md: ✅ compatible (no constitution-specific changes needed)
+  - .specify/templates/plan-template.md: ✅ compatible (Testing section already exists)
+  - .specify/templates/spec-template.md: ✅ compatible (User Scenarios & Testing section exists)
+  - .specify/templates/tasks-template.md: ✅ compatible (Test tasks already documented)
 Follow-up TODOs: None
 -->
 
@@ -80,6 +77,40 @@ Follow-up TODOs: None
 
 **理由**: 本项目是内部工具/开发工具，简化使用流程，降低开发复杂度。
 
+### VI. Comprehensive Testing Requirements
+
+完成功能后 MUST 进行全面的测试覆盖。
+
+**具体要求**:
+
+1. **后端单元测试**:
+   - 所有服务层（services）MUST 有对应的单元测试
+   - 使用 pytest 作为测试框架
+   - 测试文件放置在 `backend/tests/` 目录
+   - 覆盖核心业务逻辑和边界条件
+
+2. **后端接口测试**:
+   - 所有 API 端点 MUST 有对应的接口测试
+   - 使用 `.rest` 文件记录接口测试用例（VSCode REST Client 格式）
+   - `.rest` 文件放置在项目根目录或 `api-tests.rest`
+   - 包含正常场景和错误场景的测试用例
+
+3. **前端单元测试**:
+   - 核心组件和服务 SHOULD 有对应的单元测试
+   - 使用项目配置的测试框架
+
+4. **前端 UI 测试**:
+   - 主要用户流程 MUST 使用 Playwright 进行 E2E 测试
+   - 测试文件放置在 `frontend/e2e/` 目录
+   - 覆盖关键用户交互场景
+
+**测试验收标准**:
+- 新功能必须附带相应测试才能视为完成
+- 后端测试通过率 MUST 达到 100%
+- 关键路径的 E2E 测试 MUST 通过
+
+**理由**: 全面的测试覆盖确保代码质量、防止回归、提高重构信心、便于后续维护。
+
 ## Technology Stack Requirements
 
 ### Backend Stack
@@ -92,6 +123,8 @@ Follow-up TODOs: None
 | SQL 解析 | sqlglot |
 | LLM 集成 | OpenAI SDK |
 | 元数据存储 | SQLite |
+| 测试框架 | pytest, pytest-asyncio |
+| API 测试 | httpx, .rest 文件 |
 
 ### Frontend Stack
 
@@ -103,6 +136,7 @@ Follow-up TODOs: None
 | 样式 | Tailwind CSS |
 | UI 组件 | Ant Design |
 | SQL 编辑器 | Monaco Editor |
+| E2E 测试 | Playwright |
 
 ### JSON Serialization Convention
 
@@ -127,12 +161,22 @@ class UserResponse(BaseModel):
 2. **代码格式**: 后端使用 ruff，前端使用 prettier + eslint
 3. **SQL 安全**: 所有 SQL 语句必须经过 sqlglot 解析验证
 4. **仅允许 SELECT**: 用户输入的 SQL 仅限 SELECT 语句
+5. **测试覆盖**: 新功能必须包含相应测试（详见 Principle VI）
 
 ### SQL Query Constraints
 
 - 所有用户输入的 SQL MUST 经过 sqlglot 解析
 - 仅允许 SELECT 语句，拒绝 INSERT/UPDATE/DELETE/DDL
 - 无 LIMIT 子句时，自动添加 `LIMIT 1000`
+
+### Testing Workflow
+
+功能开发完成后的测试流程：
+
+1. **编写后端单元测试** → `pytest tests/`
+2. **编写/更新接口测试** → 更新 `api-tests.rest`
+3. **编写前端 E2E 测试** → `npx playwright test`
+4. **验证所有测试通过** → 功能完成
 
 ## Governance
 
@@ -146,8 +190,9 @@ class UserResponse(BaseModel):
 **合规检查**:
 - 所有代码审查必须验证是否符合本宪法
 - 新功能开发前必须确认不违反核心原则
+- 新功能完成后必须验证测试覆盖要求（Principle VI）
 - 复杂度引入必须有明确理由
 
 **运行时指导**: 参考 `spec/instructions.md` 获取详细开发指导。
 
-**Version**: 1.0.0 | **Ratified**: 2025-12-28 | **Last Amended**: 2025-12-28
+**Version**: 1.1.0 | **Ratified**: 2025-12-28 | **Last Amended**: 2025-12-28

@@ -8,8 +8,8 @@ import os
 
 import pytest
 
-# PostgreSQL 连接 URL
-POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://root:0412yxyxysYs@localhost:5432/postgres")
+# PostgreSQL 连接 URL (必须通过环境变量设置)
+POSTGRES_URL = os.getenv("POSTGRES_URL")
 TEST_DB_NAME = "test_postgres_db"
 
 
@@ -20,6 +20,10 @@ class TestRealPostgresIntegration:
     @pytest.fixture(autouse=True)
     async def setup_test_database(self, test_client):
         """设置测试数据库连接."""
+        # 检查是否设置了环境变量
+        if not POSTGRES_URL:
+            pytest.skip("POSTGRES_URL environment variable not set")
+
         # 创建测试数据库连接
         response = test_client.put(
             f"/api/v1/dbs/{TEST_DB_NAME}",

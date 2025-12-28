@@ -68,7 +68,8 @@ POST /api/v1/dbs/{name}/query/natural
 ## 注释
 字段注释和表注释，要在合适的地方显示，比如查询结构，表结构树中。
 
-
+## 搜索表
+一个库的表可能有几百张，需要有个搜索功能
 
 ## 添加MySQL db支持
-参考backend中的postgresSQL实现，实现Mysql的metadata提取和查询支持，同时自然语言生成也支持MySQL.目前我本地有一个mysql 
+参考backend中的postgresSQL实现，实现Mysql的metadata提取和查询支持，同时自然语言生成也支持MySQL.目前我本地有一个mysql库连接字符串是 mysql://root:123456@localhost:3306/scinew。

@@ -14,28 +14,14 @@ export interface NaturalQueryRequest {
 
 // === Response Types ===
 
-export interface ColumnInfo {
-  name: string;
-  dataType: string;
-  isNullable: boolean;
-  isPrimaryKey: boolean;
-  defaultValue?: string;
-  comment?: string;
-}
-
-export interface TableMetadata {
-  schemaName: string;
-  tableName: string;
-  tableType: 'table' | 'view';
-  columns: ColumnInfo[];
-}
+// Re-export metadata types from metadata.ts to avoid duplication
+export type { ColumnInfo, TableMetadata, DatabaseMetadata } from './metadata';
 
 export interface DatabaseResponse {
   name: string;
   url: string;
   createdAt: string;
   updatedAt: string;
-  tables?: TableMetadata[];
 }
 
 export interface DatabaseListResponse {
