@@ -30,14 +30,14 @@ import { TableSearchInput } from './TableSearchInput';
 // Database type configuration
 const DB_TYPE_CONFIG = {
   postgresql: {
-    icon: <DatabaseOutlined style={{ color: '#336791' }} />,
+    icon: <DatabaseOutlined style={{ color: '#589df6' }} />,
     label: 'PostgreSQL',
-    bgColor: '#336791',
+    bgColor: '#589df6',
   },
   mysql: {
-    icon: <DatabaseOutlined style={{ color: '#4479A1' }} />,
+    icon: <DatabaseOutlined style={{ color: '#3fb9d1' }} />,
     label: 'MySQL',
-    bgColor: '#4479A1',
+    bgColor: '#3fb9d1',
   },
 } as const;
 
@@ -61,7 +61,7 @@ const CommentText: React.FC<{ comment: string | undefined | null }> = ({ comment
   
   return (
     <span style={{ 
-      color: '#808080', 
+      color: '#909090', 
       fontSize: 10, 
       fontStyle: 'italic',
       marginLeft: 6,
@@ -364,10 +364,15 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                     style={{
                       fontSize: 9,
                       color: getDbTypeInfo(db.dbType).bgColor,
-                      background: 'rgba(255,255,255,0.1)',
-                      padding: '1px 4px',
+                      background: `${getDbTypeInfo(db.dbType).bgColor}15`,
+                      border: `1px solid ${getDbTypeInfo(db.dbType).bgColor}66`,
+                      padding: '0px 4px',
                       borderRadius: 3,
                       flexShrink: 0,
+                      lineHeight: '12px',
+                      height: '14px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
                     }}
                   >
                     {getDbTypeInfo(db.dbType).label.toUpperCase()}
