@@ -9,12 +9,20 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    // Exclude E2E tests from unit test runner
+    exclude: [
+      'node_modules/**',
+      'dist/**',
+      'e2e/**',
+      '**/*.spec.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/',
         'src/test/',
+        'e2e/',
         '**/*.d.ts',
         '**/*.config.*',
         '**/mockData',

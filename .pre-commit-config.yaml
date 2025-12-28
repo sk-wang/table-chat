@@ -1,0 +1,80 @@
+# Pre-commit hooks configuration
+# Install with: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Python code formatting and linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        name: ruff lint
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^backend/
+      - id: ruff-format
+        name: ruff format
+        files: ^backend/
+
+  # Python type checking (optional, can be slow)
+  # - repo: https://github.com/pre-commit/mirrors-mypy
+  #   rev: v1.13.0
+  #   hooks:
+  #     - id: mypy
+  #       files: ^backend/
+  #       additional_dependencies: [pydantic, fastapi]
+
+  # Frontend linting
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: frontend lint
+        entry: bash -c 'cd frontend && npm run lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|js|jsx)$
+        pass_filenames: false
+
+  # Backend unit tests
+  - repo: local
+    hooks:
+      - id: backend-tests
+        name: backend tests
+        entry: bash -c 'cd backend && python -m pytest -x -q --no-cov'
+        language: system
+        files: ^backend/
+        pass_filenames: false
+        stages: [pre-push]  # Only run on push, not commit
+
+  # Frontend unit tests  
+  - repo: local
+    hooks:
+      - id: frontend-tests
+        name: frontend tests
+        entry: bash -c 'cd frontend && npm test -- --run --reporter=dot'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+        stages: [pre-push]  # Only run on push, not commit
+
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+        exclude: \.md$
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  # Commit message linting (conventional commits)
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]
+

@@ -66,7 +66,7 @@ class TestLLMService:
     async def test_build_schema_context_no_tables(self, service):
         """Test build_schema_context returns message when no tables found."""
         with patch("app.services.llm_service.database_manager") as mock_mgr, \
-             patch("app.services.llm_service.db_manager") as mock_db:
+             patch("app.db.sqlite.db_manager") as mock_db:
             mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
             mock_db.get_metadata_for_database = AsyncMock(return_value=[])
 
@@ -90,7 +90,7 @@ class TestLLMService:
         ]
 
         with patch("app.services.llm_service.database_manager") as mock_mgr, \
-             patch("app.services.llm_service.db_manager") as mock_db:
+             patch("app.db.sqlite.db_manager") as mock_db:
             mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
 
