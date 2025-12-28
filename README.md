@@ -122,8 +122,8 @@ npm run test:e2e:ui
 ## 📝 API 文档
 
 启动后端服务后，访问：
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: http://localhost:7888/docs
+- **ReDoc**: http://localhost:7888/redoc
 
 ## 🏗️ 项目结构
 
@@ -174,7 +174,7 @@ tableChat/
 ### 1. 添加数据库连接
 
 ```bash
-curl -X PUT http://localhost:8000/api/v1/dbs/mydb \
+curl -X PUT http://localhost:7888/api/v1/dbs/mydb \
   -H "Content-Type: application/json" \
   -d '{"url": "postgresql://user:pass@localhost:5432/dbname"}'
 ```
@@ -182,7 +182,7 @@ curl -X PUT http://localhost:8000/api/v1/dbs/mydb \
 ### 2. 执行 SQL 查询
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/dbs/mydb/query \
+curl -X POST http://localhost:7888/api/v1/dbs/mydb/query \
   -H "Content-Type: application/json" \
   -d '{"sql": "SELECT * FROM users LIMIT 10"}'
 ```
@@ -190,7 +190,7 @@ curl -X POST http://localhost:8000/api/v1/dbs/mydb/query \
 ### 3. 列出所有数据库
 
 ```bash
-curl http://localhost:8000/api/v1/dbs
+curl http://localhost:7888/api/v1/dbs
 ```
 
 ## 📖 环境变量

@@ -13,8 +13,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # OpenAI Configuration
-    openai_base_url: str = "https://api.openai.com/v1"
+    # LLM Configuration (OpenAI-compatible API)
+    llm_api_base: str = "https://api.openai.com/v1"
+    llm_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+
+    # Backward compatibility aliases
+    openai_base_url: str = ""
     openai_api_key: str = ""
 
     # Database Configuration
@@ -22,11 +27,26 @@ class Settings(BaseSettings):
 
     # Server Configuration
     host: str = "0.0.0.0"
-    port: int = 8000
+    port: int = 7888
     debug: bool = False
 
     # PostgreSQL Connection Timeout (seconds)
     pg_connect_timeout: int = 10
+
+    @property
+    def effective_llm_api_base(self) -> str:
+        """Get effective LLM API base URL."""
+        return self.llm_api_base or self.openai_base_url or "https://api.openai.com/v1"
+
+    @property
+    def effective_llm_api_key(self) -> str:
+        """Get effective LLM API key."""
+        return self.llm_api_key or self.openai_api_key
+
+    @property
+    def is_llm_configured(self) -> bool:
+        """Check if LLM is properly configured."""
+        return bool(self.effective_llm_api_key)
 
 
 # Global settings instance

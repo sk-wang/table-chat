@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 
 interface SqlEditorProps {
@@ -17,14 +17,14 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 }) => {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
-  const handleEditorDidMount: OnMount = editor => {
-    editorRef.current = editor;
+  const handleEditorDidMount: OnMount = (editorInstance, monacoInstance) => {
+    editorRef.current = editorInstance;
 
     // Add Ctrl+Enter / Cmd+Enter keyboard shortcut
     if (onExecute) {
-      editor.addCommand(
+      editorInstance.addCommand(
         // eslint-disable-next-line no-bitwise
-        monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter,
         () => {
           onExecute();
         }
@@ -32,7 +32,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     }
 
     // Focus editor
-    editor.focus();
+    editorInstance.focus();
   };
 
   return (
@@ -60,4 +60,3 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
     </div>
   );
 };
-

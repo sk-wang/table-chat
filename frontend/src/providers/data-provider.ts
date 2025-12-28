@@ -56,7 +56,7 @@ export const dataProvider: DataProvider = {
     throw new Error(`Unknown resource: ${resource}`);
   },
 
-  getApiUrl: () => import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  getApiUrl: () => import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888',
 
   // Optional methods - not implemented for now
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -33,10 +33,10 @@ EOF
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-后端 API 将运行在: http://localhost:8000
+后端 API 将运行在: http://localhost:7888
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: http://localhost:7888/docs
+- **ReDoc**: http://localhost:7888/redoc
 
 ### 启动前端应用
 
@@ -71,17 +71,17 @@ npm run dev
 
 ```bash
 # 1. 添加数据库连接
-curl -X PUT http://localhost:8000/api/v1/dbs/testdb \
+curl -X PUT http://localhost:7888/api/v1/dbs/testdb \
   -H "Content-Type: application/json" \
   -d '{"url": "postgresql://root:0412yxyxysYs@localhost:5432/postgres"}'
 
 # 2. 执行查询
-curl -X POST http://localhost:8000/api/v1/dbs/testdb/query \
+curl -X POST http://localhost:7888/api/v1/dbs/testdb/query \
   -H "Content-Type: application/json" \
   -d '{"sql": "SELECT version()"}'
 
 # 3. 列出所有数据库
-curl http://localhost:8000/api/v1/dbs
+curl http://localhost:7888/api/v1/dbs
 ```
 
 ---
@@ -91,7 +91,7 @@ curl http://localhost:8000/api/v1/dbs
 ### 步骤 1: 添加数据库连接
 
 ```http
-PUT http://localhost:8000/api/v1/dbs/testdb
+PUT http://localhost:7888/api/v1/dbs/testdb
 Content-Type: application/json
 
 {
@@ -112,7 +112,7 @@ Content-Type: application/json
 ### 步骤 2: 执行简单查询
 
 ```http
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -137,7 +137,7 @@ Content-Type: application/json
 ### 步骤 3: 查询数据库版本
 
 ```http
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -148,7 +148,7 @@ Content-Type: application/json
 ### 步骤 4: 查询表信息
 
 ```http
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -166,7 +166,7 @@ Content-Type: application/json
 
 ```http
 # INSERT 语句 - 应该被拒绝
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -174,7 +174,7 @@ Content-Type: application/json
 }
 
 # UPDATE 语句 - 应该被拒绝
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -182,7 +182,7 @@ Content-Type: application/json
 }
 
 # DELETE 语句 - 应该被拒绝
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -190,7 +190,7 @@ Content-Type: application/json
 }
 
 # CREATE 语句 - 应该被拒绝
-POST http://localhost:8000/api/v1/dbs/testdb/query
+POST http://localhost:7888/api/v1/dbs/testdb/query
 Content-Type: application/json
 
 {
@@ -368,7 +368,7 @@ pip install fastapi uvicorn pydantic sqlglot psycopg2-binary aiosqlite pyhumps
 **问题**: API 请求失败
 
 **检查**:
-- 后端是否运行在 http://localhost:8000
+- 后端是否运行在 http://localhost:7888
 - CORS 配置是否正确
 - 浏览器控制台是否有错误信息
 

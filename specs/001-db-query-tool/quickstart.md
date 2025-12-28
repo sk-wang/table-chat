@@ -33,12 +33,12 @@ cd backend
 uv sync
 
 # 启动开发服务器
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --port 7888
 ```
 
-后端服务将运行在 http://localhost:8000
+后端服务将运行在 http://localhost:7888
 
-API 文档：http://localhost:8000/docs
+API 文档：http://localhost:7888/docs
 
 ### 4. 启动前端
 
@@ -102,7 +102,7 @@ npm run dev
 ### 添加数据库连接
 
 ```bash
-curl -X PUT http://localhost:8000/api/v1/dbs/my-postgres \
+curl -X PUT http://localhost:7888/api/v1/dbs/my-postgres \
   -H "Content-Type: application/json" \
   -d '{"url": "postgresql://user:password@localhost:5432/mydb"}'
 ```
@@ -110,13 +110,13 @@ curl -X PUT http://localhost:8000/api/v1/dbs/my-postgres \
 ### 获取数据库元数据
 
 ```bash
-curl http://localhost:8000/api/v1/dbs/my-postgres
+curl http://localhost:7888/api/v1/dbs/my-postgres
 ```
 
 ### 执行 SQL 查询
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/dbs/my-postgres/query \
+curl -X POST http://localhost:7888/api/v1/dbs/my-postgres/query \
   -H "Content-Type: application/json" \
   -d '{"sql": "SELECT * FROM users LIMIT 10"}'
 ```
@@ -124,7 +124,7 @@ curl -X POST http://localhost:8000/api/v1/dbs/my-postgres/query \
 ### 自然语言生成 SQL
 
 ```bash
-curl -X POST http://localhost:8000/api/v1/dbs/my-postgres/query/natural \
+curl -X POST http://localhost:7888/api/v1/dbs/my-postgres/query/natural \
   -H "Content-Type: application/json" \
   -d '{"prompt": "查询所有活跃用户"}'
 ```

@@ -27,3 +27,19 @@ class QueryResponse(CamelModel):
     result: QueryResult
     execution_time_ms: int = Field(..., description="Execution time in milliseconds")
 
+
+# === Natural Language Query Models ===
+
+
+class NaturalQueryRequest(CamelModel):
+    """Request model for natural language to SQL conversion."""
+
+    prompt: str = Field(..., description="Natural language query description")
+
+
+class NaturalQueryResponse(CamelModel):
+    """Response model for natural language to SQL conversion."""
+
+    generated_sql: str = Field(..., description="Generated SQL statement")
+    explanation: str | None = Field(None, description="Explanation of the generated SQL")
+

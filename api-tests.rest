@@ -1,6 +1,6 @@
 ### TableChat API 测试集合
 ### 基础 URL
-@baseUrl = http://localhost:8000/api/v1
+@baseUrl = http://localhost:7888/api/v1
 @pgUrl = postgresql://root:0412yxyxysYs@localhost:5432/postgres
 
 ################################################################################
@@ -253,5 +253,57 @@ Content-Type: application/json
 
 {
   "sql": "SELECT schemaname, tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' LIMIT 10"
+}
+
+################################################################################
+# 自然语言查询 API (Phase 5)
+################################################################################
+
+### 31. 自然语言查询 - 简单查询
+POST {{baseUrl}}/dbs/testdb/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "查询所有的 schema 名称"
+}
+
+### 32. 自然语言查询 - 表信息查询
+POST {{baseUrl}}/dbs/testdb/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "列出 public schema 下的所有表"
+}
+
+### 33. 自然语言查询 - 带条件的查询
+POST {{baseUrl}}/dbs/testdb/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "查询数据库的版本信息"
+}
+
+### 34. 自然语言查询 - 统计查询
+POST {{baseUrl}}/dbs/testdb/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "统计 pg_tables 表中有多少条记录"
+}
+
+### 35. 自然语言查询 - 复杂查询
+POST {{baseUrl}}/dbs/testdb/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "查询每个 schema 下有多少张表，按表数量倒序排列"
+}
+
+### 36. 自然语言查询 - 不存在的数据库
+POST {{baseUrl}}/dbs/nonexistent/query/natural
+Content-Type: application/json
+
+{
+  "prompt": "查询用户信息"
 }
 

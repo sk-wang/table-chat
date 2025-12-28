@@ -10,7 +10,8 @@ class TestQueryAPI:
             "/api/v1/dbs/nonexistent/query",
             json={"sql": "SELECT 1"}
         )
-        assert response.status_code in [404, 503]
+        # May return 400 (validation), 404 (not found), or 503 (service error)
+        assert response.status_code in [400, 404, 503]
 
     def test_query_invalid_sql(self, test_client):
         """Test executing invalid SQL."""

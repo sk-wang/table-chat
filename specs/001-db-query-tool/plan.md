@@ -132,7 +132,7 @@ OPENAI_API_KEY=sk-xxx
 DATABASE_PATH=./scinew.db
 
 # Frontend (.env)
-VITE_API_BASE_URL=http://localhost:8000
+VITE_API_BASE_URL=http://localhost:7888
 ```
 
 ## Complexity Tracking

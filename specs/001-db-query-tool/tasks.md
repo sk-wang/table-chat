@@ -94,25 +94,25 @@
 
 ### Backend - US2
 
-- [ ] T033 [P] [US2] Create QueryRequest/QueryResponse models in `backend/app/models/query.py`
-- [ ] T034 [P] [US2] Create QueryResult model in `backend/app/models/query.py`
-- [ ] T035 [US2] Implement SQL parsing with sqlglot in `backend/app/services/query_service.py`
-- [ ] T036 [US2] Implement SELECT-only validation in `backend/app/services/query_service.py`
-- [ ] T037 [US2] Implement auto LIMIT 1000 injection in `backend/app/services/query_service.py`
-- [ ] T038 [US2] Implement query execution against PostgreSQL in `backend/app/services/query_service.py`
-- [ ] T039 [US2] Create POST /api/v1/dbs/{name}/query endpoint in `backend/app/api/v1/query.py`
-- [ ] T040 [US2] Add SQL syntax error handling with line/column info in `backend/app/api/v1/query.py`
+- [x] T033 [P] [US2] Create QueryRequest/QueryResponse models in `backend/app/models/query.py`
+- [x] T034 [P] [US2] Create QueryResult model in `backend/app/models/query.py`
+- [x] T035 [US2] Implement SQL parsing with sqlglot in `backend/app/services/query_service.py`
+- [x] T036 [US2] Implement SELECT-only validation in `backend/app/services/query_service.py`
+- [x] T037 [US2] Implement auto LIMIT 1000 injection in `backend/app/services/query_service.py`
+- [x] T038 [US2] Implement query execution against PostgreSQL in `backend/app/services/query_service.py`
+- [x] T039 [US2] Create POST /api/v1/dbs/{name}/query endpoint in `backend/app/api/v1/query.py`
+- [x] T040 [US2] Add SQL syntax error handling with line/column info in `backend/app/api/v1/query.py`
 
 ### Frontend - US2
 
-- [ ] T041 [P] [US2] Create Monaco SQL Editor component in `frontend/src/components/editor/SqlEditor.tsx`
-- [ ] T042 [P] [US2] Create QueryResultTable component in `frontend/src/components/results/QueryResultTable.tsx`
-- [ ] T043 [P] [US2] Create query toolbar (Execute button) in `frontend/src/components/editor/QueryToolbar.tsx`
-- [ ] T044 [US2] Create query page layout in `frontend/src/pages/query/index.tsx`
-- [ ] T045 [US2] Implement query execution with loading state in `frontend/src/pages/query/index.tsx`
-- [ ] T046 [US2] Implement error display for SQL errors in `frontend/src/components/editor/SqlEditor.tsx`
-- [ ] T047 [US2] Add empty result state ("无数据") in `frontend/src/components/results/QueryResultTable.tsx`
-- [ ] T048 [US2] Add truncation warning when result is limited in `frontend/src/components/results/QueryResultTable.tsx`
+- [x] T041 [P] [US2] Create Monaco SQL Editor component in `frontend/src/components/editor/SqlEditor.tsx`
+- [x] T042 [P] [US2] Create QueryResultTable component in `frontend/src/components/results/QueryResultTable.tsx`
+- [x] T043 [P] [US2] Create query toolbar (Execute button) in `frontend/src/components/editor/QueryToolbar.tsx`
+- [x] T044 [US2] Create query page layout in `frontend/src/pages/query/index.tsx`
+- [x] T045 [US2] Implement query execution with loading state in `frontend/src/pages/query/index.tsx`
+- [x] T046 [US2] Implement error display for SQL errors in `frontend/src/components/editor/SqlEditor.tsx`
+- [x] T047 [US2] Add empty result state ("无数据") in `frontend/src/components/results/QueryResultTable.tsx`
+- [x] T048 [US2] Add truncation warning when result is limited in `frontend/src/components/results/QueryResultTable.tsx`
 
 **Checkpoint**: User Story 2 完成 - SQL 编辑器和查询执行功能可用
 
@@ -126,20 +126,20 @@
 
 ### Backend - US3
 
-- [ ] T049 [P] [US3] Create NaturalQueryRequest/Response models in `backend/app/models/query.py`
-- [ ] T050 [US3] Implement OpenAI client with env config in `backend/app/services/llm_service.py`
-- [ ] T051 [US3] Implement schema context builder for LLM in `backend/app/services/llm_service.py`
-- [ ] T052 [US3] Implement natural language to SQL conversion in `backend/app/services/llm_service.py`
-- [ ] T053 [US3] Create POST /api/v1/dbs/{name}/query/natural endpoint in `backend/app/api/v1/query.py`
-- [ ] T054 [US3] Add LLM service unavailable error handling in `backend/app/api/v1/query.py`
+- [x] T049 [P] [US3] Create NaturalQueryRequest/Response models in `backend/app/models/query.py`
+- [x] T050 [US3] Implement OpenAI client with env config in `backend/app/services/llm_service.py`
+- [x] T051 [US3] Implement schema context builder for LLM in `backend/app/services/llm_service.py`
+- [x] T052 [US3] Implement natural language to SQL conversion in `backend/app/services/llm_service.py`
+- [x] T053 [US3] Create POST /api/v1/dbs/{name}/query/natural endpoint in `backend/app/api/v1/query.py`
+- [x] T054 [US3] Add LLM service unavailable error handling in `backend/app/api/v1/query.py`
 
 ### Frontend - US3
 
-- [ ] T055 [P] [US3] Create NaturalLanguageInput component in `frontend/src/components/editor/NaturalLanguageInput.tsx`
-- [ ] T056 [US3] Add tab switching (SQL / Natural Language) in `frontend/src/pages/query/index.tsx`
-- [ ] T057 [US3] Implement natural language query with loading state in `frontend/src/pages/query/index.tsx`
-- [ ] T058 [US3] Display generated SQL in editor for confirmation in `frontend/src/pages/query/index.tsx`
-- [ ] T059 [US3] Add LLM unavailable graceful degradation message in `frontend/src/components/editor/NaturalLanguageInput.tsx`
+- [x] T055 [P] [US3] Create NaturalLanguageInput component in `frontend/src/components/editor/NaturalLanguageInput.tsx`
+- [x] T056 [US3] Add tab switching (SQL / Natural Language) in `frontend/src/pages/query/index.tsx`
+- [x] T057 [US3] Implement natural language query with loading state in `frontend/src/pages/query/index.tsx`
+- [x] T058 [US3] Display generated SQL in editor for confirmation in `frontend/src/pages/query/index.tsx`
+- [x] T059 [US3] Add LLM unavailable graceful degradation message in `frontend/src/components/editor/NaturalLanguageInput.tsx`
 
 **Checkpoint**: User Story 3 完成 - 自然语言查询功能可用
 
