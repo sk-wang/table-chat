@@ -1,0 +1,257 @@
+### TableChat API 测试集合
+### 基础 URL
+@baseUrl = http://localhost:8000/api/v1
+@pgUrl = postgresql://root:0412yxyxysYs@localhost:5432/postgres
+
+################################################################################
+# 数据库管理 API
+################################################################################
+
+### 1. 列出所有数据库连接
+GET {{baseUrl}}/dbs
+Content-Type: application/json
+
+### 2. 添加 PostgreSQL 数据库连接
+PUT {{baseUrl}}/dbs/testdb
+Content-Type: application/json
+
+{
+  "url": "{{pgUrl}}"
+}
+
+### 3. 获取特定数据库信息
+GET {{baseUrl}}/dbs/testdb
+Content-Type: application/json
+
+### 4. 更新数据库连接
+PUT {{baseUrl}}/dbs/testdb
+Content-Type: application/json
+
+{
+  "url": "{{pgUrl}}"
+}
+
+### 5. 删除数据库连接
+DELETE {{baseUrl}}/dbs/testdb
+Content-Type: application/json
+
+################################################################################
+# SQL 查询 API
+################################################################################
+
+### 6. 执行简单查询 - SELECT 1
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT 1 as test_column"
+}
+
+### 7. 查询当前数据库版本
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT version()"
+}
+
+### 8. 查询当前时间
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT NOW() as current_time, CURRENT_USER as current_user"
+}
+
+### 9. 列出所有表 (public schema)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+}
+
+### 10. 查询带 LIMIT 的语句（测试 LIMIT 保留）
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT * FROM pg_tables LIMIT 5"
+}
+
+### 11. 查询不带 LIMIT（测试自动注入 LIMIT 1000）
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT * FROM pg_tables"
+}
+
+### 12. 测试 WHERE 条件查询
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT * FROM pg_tables WHERE schemaname = 'public'"
+}
+
+### 13. 测试 JOIN 查询
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT t.tablename, c.column_name, c.data_type FROM pg_tables t JOIN information_schema.columns c ON t.tablename = c.table_name WHERE t.schemaname = 'public' LIMIT 10"
+}
+
+################################################################################
+# 错误处理测试
+################################################################################
+
+### 14. 测试 SQL 语法错误
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELEC * FRM pg_tables"
+}
+
+### 15. 测试非 SELECT 语句 - INSERT (应该被拒绝)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "INSERT INTO test_table VALUES (1, 'test')"
+}
+
+### 16. 测试非 SELECT 语句 - UPDATE (应该被拒绝)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "UPDATE pg_tables SET tablename = 'hacked'"
+}
+
+### 17. 测试非 SELECT 语句 - DELETE (应该被拒绝)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "DELETE FROM pg_tables"
+}
+
+### 18. 测试 DDL 语句 - CREATE (应该被拒绝)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "CREATE TABLE evil_table (id INT)"
+}
+
+### 19. 测试 DDL 语句 - DROP (应该被拒绝)
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "DROP TABLE pg_tables"
+}
+
+### 20. 测试查询不存在的数据库
+POST {{baseUrl}}/dbs/nonexistent/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT 1"
+}
+
+################################################################################
+# Schema 浏览测试
+################################################################################
+
+### 21. 列出所有 schema
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT schema_name FROM information_schema.schemata ORDER BY schema_name"
+}
+
+### 22. 列出某个 schema 的所有表
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name"
+}
+
+### 23. 查询表的列信息
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'pg_tables' ORDER BY ordinal_position"
+}
+
+### 24. 查询表的主键信息
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT tc.table_name, kcu.column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name WHERE tc.constraint_type = 'PRIMARY KEY' AND tc.table_schema = 'public' LIMIT 10"
+}
+
+################################################################################
+# 性能测试
+################################################################################
+
+### 25. 测试大结果集（自动 LIMIT）
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT * FROM information_schema.columns"
+}
+
+### 26. 测试复杂查询
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT t.tablename, COUNT(c.column_name) as column_count FROM pg_tables t LEFT JOIN information_schema.columns c ON t.tablename = c.table_name WHERE t.schemaname = 'public' GROUP BY t.tablename ORDER BY column_count DESC"
+}
+
+################################################################################
+# 实用查询示例
+################################################################################
+
+### 27. 查询数据库大小
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT pg_database.datname as database_name, pg_size_pretty(pg_database_size(pg_database.datname)) as size FROM pg_database ORDER BY pg_database_size(pg_database.datname) DESC LIMIT 10"
+}
+
+### 28. 查询表大小
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as size FROM pg_tables WHERE schemaname = 'public' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC LIMIT 10"
+}
+
+### 29. 查询活动连接数
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT count(*) as active_connections FROM pg_stat_activity WHERE state = 'active'"
+}
+
+### 30. 查询索引信息
+POST {{baseUrl}}/dbs/testdb/query
+Content-Type: application/json
+
+{
+  "sql": "SELECT schemaname, tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' LIMIT 10"
+}
+

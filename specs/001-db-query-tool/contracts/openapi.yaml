@@ -1,0 +1,397 @@
+openapi: 3.1.0
+info:
+  title: TableChat API
+  description: 数据库查询工具 API - 支持 PostgreSQL 元数据管理和 SQL 查询
+  version: 1.0.0
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server
+
+paths:
+  /api/v1/dbs:
+    get:
+      operationId: listDatabases
+      summary: 获取所有已存储的数据库连接
+      tags:
+        - Databases
+      responses:
+        '200':
+          description: 数据库列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseListResponse'
+
+  /api/v1/dbs/{name}:
+    get:
+      operationId: getDatabase
+      summary: 获取单个数据库的详细信息和 metadata
+      tags:
+        - Databases
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库连接名称
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 数据库详情（包含表和视图 metadata）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseResponse'
+        '404':
+          description: 数据库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      operationId: createOrUpdateDatabase
+      summary: 添加或更新数据库连接
+      tags:
+        - Databases
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库连接名称
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatabaseCreateRequest'
+      responses:
+        '200':
+          description: 数据库连接已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseResponse'
+        '201':
+          description: 数据库连接已创建
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatabaseResponse'
+        '400':
+          description: 连接字符串无效或连接失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      operationId: deleteDatabase
+      summary: 删除数据库连接
+      tags:
+        - Databases
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库连接名称
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 数据库连接已删除
+        '404':
+          description: 数据库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/dbs/{name}/query:
+    post:
+      operationId: executeQuery
+      summary: 执行 SQL 查询
+      description: |
+        执行用户提供的 SQL SELECT 语句。
+        - 仅支持 SELECT 语句
+        - 无 LIMIT 子句时自动添加 LIMIT 1000
+        - 返回查询结果为 JSON 格式
+      tags:
+        - Query
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库连接名称
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          description: SQL 语法错误或非 SELECT 语句
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 数据库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: 数据库连接失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/dbs/{name}/query/natural:
+    post:
+      operationId: naturalLanguageQuery
+      summary: 自然语言生成 SQL
+      description: |
+        根据用户的自然语言描述生成 SQL 查询语句。
+        使用数据库的表/视图 metadata 作为上下文。
+      tags:
+        - Query
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库连接名称
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NaturalQueryRequest'
+      responses:
+        '200':
+          description: SQL 生成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NaturalQueryResponse'
+        '404':
+          description: 数据库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: LLM 服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    DatabaseCreateRequest:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: PostgreSQL 连接字符串
+          example: postgresql://user:password@localhost:5432/dbname
+
+    QueryRequest:
+      type: object
+      required:
+        - sql
+      properties:
+        sql:
+          type: string
+          description: SQL SELECT 语句
+          example: SELECT * FROM users WHERE active = true
+
+    NaturalQueryRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          description: 自然语言查询描述
+          example: 查询所有活跃用户的邮箱
+
+    ColumnInfo:
+      type: object
+      required:
+        - name
+        - dataType
+        - isNullable
+        - isPrimaryKey
+      properties:
+        name:
+          type: string
+          description: 字段名称
+        dataType:
+          type: string
+          description: 数据类型
+        isNullable:
+          type: boolean
+          description: 是否允许 NULL
+        isPrimaryKey:
+          type: boolean
+          description: 是否为主键
+        defaultValue:
+          type: string
+          nullable: true
+          description: 默认值
+        comment:
+          type: string
+          nullable: true
+          description: 字段注释
+
+    TableMetadata:
+      type: object
+      required:
+        - schemaName
+        - tableName
+        - tableType
+        - columns
+      properties:
+        schemaName:
+          type: string
+          description: Schema 名称
+        tableName:
+          type: string
+          description: 表/视图名称
+        tableType:
+          type: string
+          enum: [table, view]
+          description: 类型
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnInfo'
+
+    DatabaseResponse:
+      type: object
+      required:
+        - name
+        - url
+        - createdAt
+        - updatedAt
+      properties:
+        name:
+          type: string
+          description: 连接名称
+        url:
+          type: string
+          description: 连接字符串（密码已脱敏）
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新时间
+        tables:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/TableMetadata'
+          description: 表和视图 metadata（仅在获取详情时返回）
+
+    DatabaseListResponse:
+      type: object
+      required:
+        - databases
+      properties:
+        databases:
+          type: array
+          items:
+            $ref: '#/components/schemas/DatabaseResponse'
+
+    QueryResult:
+      type: object
+      required:
+        - columns
+        - rows
+        - rowCount
+        - truncated
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: 列名列表
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: 数据行
+        rowCount:
+          type: integer
+          description: 返回的行数
+        truncated:
+          type: boolean
+          description: 是否因 LIMIT 被截断
+
+    QueryResponse:
+      type: object
+      required:
+        - sql
+        - result
+        - executionTimeMs
+      properties:
+        sql:
+          type: string
+          description: 实际执行的 SQL（可能包含自动添加的 LIMIT）
+        result:
+          $ref: '#/components/schemas/QueryResult'
+        executionTimeMs:
+          type: integer
+          description: 执行耗时（毫秒）
+
+    NaturalQueryResponse:
+      type: object
+      required:
+        - generatedSql
+      properties:
+        generatedSql:
+          type: string
+          description: 生成的 SQL 语句
+        explanation:
+          type: string
+          nullable: true
+          description: SQL 解释（可选）
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: 错误信息
+        detail:
+          type: string
+          nullable: true
+          description: 详细错误说明
+
