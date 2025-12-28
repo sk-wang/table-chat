@@ -35,33 +35,22 @@ interface DatabaseSidebarProps {
 
 const { Text } = Typography;
 
-// Helper function to truncate text and return if truncated
-const truncateText = (text: string | undefined | null, maxLength: number): { text: string; isTruncated: boolean } => {
-  if (!text) return { text: '', isTruncated: false };
-  if (text.length <= maxLength) return { text, isTruncated: false };
-  return { text: text.slice(0, maxLength) + '...', isTruncated: true };
-};
-
-// Comment display component with optional tooltip for long text
-const CommentText: React.FC<{ comment: string | undefined | null; maxLength: number }> = ({ comment, maxLength }) => {
+// Comment display component - inline with word wrap when needed
+const CommentText: React.FC<{ comment: string | undefined | null }> = ({ comment }) => {
   if (!comment) return null;
-  const { text, isTruncated } = truncateText(comment, maxLength);
   
-  const content = (
-    <span style={{ color: '#808080', marginLeft: 6, fontSize: 10, fontStyle: 'italic' }}>
-      {text}
+  return (
+    <span style={{ 
+      color: '#808080', 
+      fontSize: 10, 
+      fontStyle: 'italic',
+      marginLeft: 6,
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+    }}>
+      {comment}
     </span>
   );
-  
-  if (isTruncated) {
-    return (
-      <Tooltip title={comment} placement="right">
-        {content}
-      </Tooltip>
-    );
-  }
-  
-  return content;
 };
 
 export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
@@ -125,13 +114,13 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       children: tables.map(table => ({
         key: `table-${schema}-${table.tableName}`,
         title: (
-          <span style={{ color: '#a9b7c6', fontSize: 12 }}>
+          <div style={{ color: '#a9b7c6', fontSize: 12, whiteSpace: 'normal', wordBreak: 'break-word', padding: '2px 0' }}>
             {table.tableName}
             <span style={{ color: '#666', marginLeft: 4, fontSize: 10 }}>
               ({table.columns?.length || 0} cols)
             </span>
-            <CommentText comment={table.comment} maxLength={50} />
-          </span>
+            <CommentText comment={table.comment} />
+          </div>
         ),
         icon: table.tableType === 'view' 
           ? <EyeOutlined style={{ color: '#cc7832' }} />
@@ -140,7 +129,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
         children: (table.columns || []).map(column => ({
           key: `column-${schema}-${table.tableName}-${column.name}`,
           title: (
-            <span style={{ fontSize: 11, color: '#a9b7c6' }}>
+            <div style={{ fontSize: 11, color: '#a9b7c6', whiteSpace: 'normal', wordBreak: 'break-word', padding: '1px 0' }}>
               {column.isPrimaryKey && (
                 <KeyOutlined style={{ color: '#faad14', marginRight: 4, fontSize: 10 }} />
               )}
@@ -151,8 +140,8 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                 {column.dataType}
                 {!column.isNullable && <span style={{ color: '#cc7832' }}> NOT NULL</span>}
               </span>
-              <CommentText comment={column.comment} maxLength={30} />
-            </span>
+              <CommentText comment={column.comment} />
+            </div>
           ),
           isLeaf: true,
         })),
@@ -356,7 +345,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
         <div style={{ 
           overflowY: 'auto', 
           overflowX: 'hidden',
-          maxHeight: 'calc(100vh - 300px)',
+          flex: 1,
         }}>
           {!selectedDatabase ? (
             <div style={{ padding: '12px', textAlign: 'center' }}>
@@ -406,12 +395,72 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       width: '100%',
       minWidth: 0,
     }}>
+      <style>{`
+        .ant-collapse {
+          display: flex !important;
+          flex-direction: column !important;
+          height: 100% !important;
+          border-radius: 0 !important;
+          background: transparent !important;
+        }
+        .ant-collapse-item {
+          display: flex !important;
+          flex-direction: column !important;
+          border-bottom: 1px solid #323232 !important;
+        }
+        /* Schema panel (the second item) should fill space when active */
+        .ant-collapse-item-active:last-child {
+          flex: 1 !important;
+          min-height: 0;
+        }
+        .ant-collapse-item:not(.ant-collapse-item-active) {
+          flex: 0 0 auto !important;
+        }
+        .ant-collapse-header {
+          flex-shrink: 0 !important;
+          background: #3c3f41 !important;
+          padding: 8px 12px !important;
+          cursor: pointer !important;
+        }
+        .ant-tree-node-content-wrapper {
+          white-space: normal !important;
+          height: auto !important;
+          min-height: 24px;
+          display: flex !important;
+          align-items: flex-start !important;
+          padding-top: 2px !important;
+          padding-bottom: 2px !important;
+          cursor: pointer !important;
+        }
+        .ant-tree-title {
+          width: 100%;
+        }
+        .ant-tree-indent-unit {
+          width: 12px !important;
+        }
+        .ant-collapse-content {
+          background: transparent !important;
+          overflow: hidden !important;
+        }
+        .ant-collapse-item-active > .ant-collapse-content {
+          flex: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        .ant-collapse-content-box {
+          flex: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+        }
+      `}</style>
       <Collapse
         activeKey={activeKeys}
         onChange={(keys) => setActiveKeys(keys as string[])}
         bordered={false}
         expandIcon={({ isActive }) => 
-          isActive ? <DownOutlined style={{ fontSize: 10 }} /> : <RightOutlined style={{ fontSize: 10 }} />
+          isActive ? <DownOutlined style={{ fontSize: 10, color: '#909090' }} /> : <RightOutlined style={{ fontSize: 10, color: '#909090' }} />
         }
         style={{ 
           background: 'transparent',
