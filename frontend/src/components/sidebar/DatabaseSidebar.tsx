@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   Typography,
   Button,
@@ -26,6 +26,9 @@ import { AddDatabaseModal } from '../database/AddDatabaseModal';
 import { apiClient } from '../../services/api';
 import type { TableMetadata } from '../../types/metadata';
 import { TableSearchInput } from './TableSearchInput';
+
+// 大数据量阈值：超过此数量启用性能优化模式
+const LARGE_DATASET_THRESHOLD = 100;
 
 // Database type configuration
 const DB_TYPE_CONFIG = {
@@ -92,6 +95,9 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   const [activeKeys, setActiveKeys] = useState<string[]>(['databases', 'schema']);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTables, setFilteredTables] = useState<TableMetadata[] | null>(null);
+  const [treeHeight, setTreeHeight] = useState(300);
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -136,8 +142,57 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     return metadata?.length || 0;
   }, [metadata]);
 
-  // Build tree data for metadata with columns
-  const buildMetadataTree = (): DataNode[] => {
+  // 是否为大数据集
+  const isLargeDataset = originalTableCount > LARGE_DATASET_THRESHOLD;
+
+  // 计算树容器高度
+  useEffect(() => {
+    const updateHeight = () => {
+      if (treeContainerRef.current) {
+        const rect = treeContainerRef.current.getBoundingClientRect();
+        setTreeHeight(Math.max(rect.height, 200));
+      }
+    };
+    
+    updateHeight();
+    const resizeObserver = new ResizeObserver(updateHeight);
+    if (treeContainerRef.current) {
+      resizeObserver.observe(treeContainerRef.current);
+    }
+    
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // 当表数据变化时，设置默认展开的 keys（只展开 schema 层）
+  useEffect(() => {
+    if (!displayTables || displayTables.length === 0) {
+      setExpandedKeys([]);
+      return;
+    }
+    
+    // 获取所有 schema keys
+    const schemaKeys = new Set<string>();
+    displayTables.forEach(table => {
+      const schema = table.schemaName || 'public';
+      schemaKeys.add(`schema-${schema}`);
+    });
+    
+    // 大数据集只展开 schema，小数据集可以展开全部
+    if (isLargeDataset) {
+      setExpandedKeys(Array.from(schemaKeys));
+    } else {
+      // 小数据集可以展开所有（包括表）
+      const allKeys: string[] = Array.from(schemaKeys);
+      displayTables.forEach(table => {
+        const schema = table.schemaName || 'public';
+        allKeys.push(`table-${schema}-${table.tableName}`);
+      });
+      setExpandedKeys(allKeys);
+    }
+  }, [displayTables, isLargeDataset]);
+
+  // 构建树数据 - 使用 useMemo 缓存
+  const treeData = useMemo((): DataNode[] => {
     if (!displayTables || displayTables.length === 0) return [];
 
     // Group by schema
@@ -194,7 +249,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
         })),
       })),
     }));
-  };
+  }, [displayTables]);
 
   const handleTreeSelect = (selectedKeys: React.Key[]) => {
     if (selectedKeys.length === 0) return;
@@ -431,11 +486,14 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
           )}
 
           {/* Table tree */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
+          <div 
+            ref={treeContainerRef}
+            style={{
+              flex: 1,
+              overflowY: isLargeDataset ? 'hidden' : 'auto',
+              overflowX: 'hidden',
+            }}
+          >
             {!selectedDatabase ? (
               <div style={{ padding: '12px', textAlign: 'center' }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -447,7 +505,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                 <Spin size="small" />
                 <br />
                 <Text type="secondary" style={{ fontSize: 11, marginTop: 8 }}>
-                  Loading...
+                  Loading {isLargeDataset ? '大量表数据，请稍候...' : '...'}
                 </Text>
               </div>
             ) : searchQuery && tableCount === 0 ? (
@@ -459,9 +517,13 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
             ) : displayTables && tableCount > 0 ? (
               <Tree
                 showIcon
-                defaultExpandAll
-                treeData={buildMetadataTree()}
+                treeData={treeData}
+                expandedKeys={expandedKeys}
+                onExpand={setExpandedKeys}
                 onSelect={handleTreeSelect}
+                // 大数据集启用虚拟滚动
+                virtual={isLargeDataset}
+                height={isLargeDataset ? treeHeight : undefined}
                 style={{
                   background: 'transparent',
                   fontSize: 12,
