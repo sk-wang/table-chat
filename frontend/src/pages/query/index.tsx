@@ -113,6 +113,8 @@ export const QueryPage: React.FC = () => {
     setSqlQuery(sql);
     setQueryMode('sql');
     message.info(`Generated SELECT for ${tableName}`);
+    // Also load table details for column comments
+    loadTableDetails(schemaName, tableName);
   };
 
   const handleExecute = async () => {
