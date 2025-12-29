@@ -11,6 +11,7 @@ export const CACHE_KEYS = {
   SELECTED_DATABASE: 'tablechat_selected_database',
   TABLE_LIST: 'tablechat_table_list',
   TABLE_DETAILS: 'tablechat_table_details',
+  QUERY_PANEL_RATIO: 'tablechat_query_panel_ratio',
 } as const;
 
 /** Cache data structure */
@@ -49,8 +50,14 @@ export interface TableDetailsCache {
   }>;
 }
 
+/** Query panel ratio cache */
+export interface QueryPanelRatioCache {
+  editorRatio: number;
+}
+
 /** All cache types union for type-safe access */
 export type CacheType =
   | SelectedDatabaseCache
   | TableListCache
-  | TableDetailsCache;
+  | TableDetailsCache
+  | QueryPanelRatioCache;

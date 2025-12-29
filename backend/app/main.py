@@ -12,7 +12,7 @@ from app.db.sqlite import db_manager
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan handler."""
     # Startup: Initialize database schema
     await db_manager.init_schema()

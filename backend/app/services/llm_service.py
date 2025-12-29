@@ -157,7 +157,7 @@ Example output:
         self,
         db_name: str,
         prompt: str,
-        db_type: str = "postgresql",
+        _db_type: str = "postgresql",  # Reserved for future dialect-specific table selection
     ) -> tuple[list[str], bool]:
         """
         Select relevant tables for a natural language query (Phase 1).

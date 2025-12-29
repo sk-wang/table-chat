@@ -6,6 +6,7 @@ import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
 import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
+import { ResizableSplitPane } from '../../components/layout/ResizableSplitPane';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import {
@@ -413,55 +414,68 @@ export const QueryPage: React.FC = () => {
           showDatabaseSelector={false}
         />
 
-        {/* Editor Tabs */}
-        <Tabs
-          activeKey={queryMode}
-          onChange={(key) => setQueryMode(key as QueryMode)}
-          items={tabItems}
-          style={{ marginBottom: 8 }}
-        />
+        {/* Resizable Split Pane - Editor on top, Results on bottom */}
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <ResizableSplitPane
+            topPanel={
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                {/* Editor Tabs */}
+                <Tabs
+                  activeKey={queryMode}
+                  onChange={(key) => setQueryMode(key as QueryMode)}
+                  items={tabItems}
+                  style={{ marginBottom: 8 }}
+                />
 
-        {/* Show generated explanation if available */}
-        {generatedExplanation && queryMode === 'sql' && (
-          <Alert
-            message="AI 生成的 SQL"
-            description={
-              <div>
-                <Text style={{ color: '#a9b7c6' }}>{generatedExplanation}</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  请检查生成的查询，确认无误后点击"Execute"执行
-                </Text>
+                {/* Show generated explanation if available */}
+                {generatedExplanation && queryMode === 'sql' && (
+                  <Alert
+                    message="AI 生成的 SQL"
+                    description={
+                      <div>
+                        <Text style={{ color: '#a9b7c6' }}>{generatedExplanation}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          请检查生成的查询，确认无误后点击"Execute"执行
+                        </Text>
+                      </div>
+                    }
+                    type="info"
+                    showIcon
+                    icon={<RobotOutlined />}
+                    closable
+                    onClose={() => setGeneratedExplanation(null)}
+                    style={{ marginBottom: 12, background: '#2d3436', borderColor: '#80CBC4' }}
+                  />
+                )}
+
+                {error && (
+                  <Alert
+                    message="Query Error"
+                    description={error}
+                    type="error"
+                    showIcon
+                    closable
+                    onClose={() => setError(null)}
+                    style={{ marginBottom: 12 }}
+                  />
+                )}
               </div>
             }
-            type="info"
-            showIcon
-            icon={<RobotOutlined />}
-            closable
-            onClose={() => setGeneratedExplanation(null)}
-            style={{ marginBottom: 12, background: '#2d3436', borderColor: '#80CBC4' }}
-          />
-        )}
-
-        {error && (
-          <Alert
-            message="Query Error"
-            description={error}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setError(null)}
-            style={{ marginBottom: 12 }}
-          />
-        )}
-
-        {/* Results */}
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <QueryResultTable
-            result={result}
-            executionTimeMs={executionTimeMs}
-            loading={executing}
-            metadata={metadata}
+            bottomPanel={
+              <div style={{ height: '100%', overflow: 'auto' }}>
+                <QueryResultTable
+                  result={result}
+                  executionTimeMs={executionTimeMs}
+                  loading={executing}
+                  metadata={metadata}
+                />
+              </div>
+            }
+            defaultRatio={0.4}
+            minTopHeight={100}
+            minBottomHeight={100}
+            storageKey="tablechat_query_panel_ratio"
           />
         </div>
       </Content>

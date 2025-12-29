@@ -14,6 +14,7 @@ import type {
   SelectedDatabaseCache,
   TableListCache,
   TableDetailsCache,
+  QueryPanelRatioCache,
 } from '../types/storage';
 
 // Development mode logging (T020)
@@ -339,6 +340,55 @@ export const clearTableDetailsCache = (databaseName?: string, tableName?: string
         logCacheClear('TableDetails');
       });
   }
+};
+
+// ============================================
+// Query Panel Ratio Cache (US2 - Phase 2)
+// ============================================
+
+/**
+ * Get cached query panel ratio
+ * Returns the editor ratio (0-1) or null if not cached
+ */
+export const getQueryPanelRatio = (): number | null => {
+  const wrapped = safeGetItem<CacheData<QueryPanelRatioCache>>(CACHE_KEYS.QUERY_PANEL_RATIO);
+  const cache = unwrapCache(wrapped);
+
+  if (cache) {
+    logCacheHit('QueryPanelRatio', 'ratio');
+    // Validate ratio is within bounds (0.1 - 0.9)
+    if (cache.editorRatio >= 0.1 && cache.editorRatio <= 0.9) {
+      return cache.editorRatio;
+    }
+  } else {
+    logCacheMiss('QueryPanelRatio', 'ratio');
+  }
+
+  return null;
+};
+
+/**
+ * Set query panel ratio
+ * Stores the editor ratio (0-1) to localStorage
+ */
+export const setQueryPanelRatio = (ratio: number): void => {
+  // Validate ratio bounds
+  if (ratio < 0.1 || ratio > 0.9) {
+    console.warn(`[Cache] Invalid ratio ${ratio}, must be between 0.1 and 0.9`);
+    return;
+  }
+
+  const cache: QueryPanelRatioCache = { editorRatio: ratio };
+  safeSetItem(CACHE_KEYS.QUERY_PANEL_RATIO, wrapCache(cache));
+};
+
+/**
+ * Clear query panel ratio cache
+ * Useful for testing/reset
+ */
+export const clearQueryPanelRatio = (): void => {
+  safeRemoveItem(CACHE_KEYS.QUERY_PANEL_RATIO);
+  logCacheClear('QueryPanelRatio');
 };
 
 // ============================================
