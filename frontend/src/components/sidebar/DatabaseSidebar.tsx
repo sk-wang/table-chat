@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Typography,
   Button,
@@ -97,6 +97,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   const [activeKeys, setActiveKeys] = useState<string[]>(['databases', 'schema']);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTables, setFilteredTables] = useState<TableMetadata[] | null>(null);
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -201,6 +202,14 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     }));
   }, [displayTables]);
 
+  // Initialize expanded keys when treeData changes (expand schemas by default)
+  useEffect(() => {
+    if (treeData.length > 0) {
+      const schemaKeys = treeData.map(node => node.key as string);
+      setExpandedKeys(schemaKeys);
+    }
+  }, [treeData]);
+
   const handleTreeSelect = (selectedKeys: React.Key[]) => {
     if (selectedKeys.length === 0) return;
     const key = selectedKeys[0] as string;
@@ -213,9 +222,12 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     }
   };
 
-  const handleTreeExpand = (expandedKeys: React.Key[]) => {
+  const handleTreeExpand = (newExpandedKeys: React.Key[]) => {
+    // Update controlled state
+    setExpandedKeys(newExpandedKeys);
+    
     // When a table node is expanded, load its details if not already loaded
-    expandedKeys.forEach(key => {
+    newExpandedKeys.forEach(key => {
       const keyStr = key as string;
       if (keyStr.startsWith('table-') && !keyStr.startsWith('column-')) {
         const parts = keyStr.replace('table-', '').split('-');
@@ -486,7 +498,9 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
             ) : displayTables && tableCount > 0 ? (
               <Tree
                 showIcon
-                defaultExpandedKeys={treeData.map(node => node.key as string)}
+                virtual
+                height={400}
+                expandedKeys={expandedKeys}
                 treeData={treeData}
                 onSelect={handleTreeSelect}
                 onExpand={handleTreeExpand}
