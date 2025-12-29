@@ -9,6 +9,13 @@ export interface ColumnInfo {
   comment?: string;
 }
 
+export interface TableSummary {
+  schemaName: string;
+  tableName: string;
+  tableType: 'table' | 'view';
+  comment?: string;
+}
+
 export interface TableMetadata {
   schemaName: string;
   tableName: string;
@@ -22,6 +29,13 @@ export interface DatabaseMetadata {
   name: string;
   schemas: string[];
   tables: TableMetadata[];
+  lastRefreshed?: string;
+}
+
+export interface TableListResponse {
+  name: string;
+  schemas: string[];
+  tables: TableSummary[];
   lastRefreshed?: string;
 }
 

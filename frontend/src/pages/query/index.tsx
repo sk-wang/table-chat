@@ -9,7 +9,7 @@ import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import type { QueryResult } from '../../types';
-import type { TableMetadata } from '../../types/metadata';
+import type { TableMetadata, TableSummary } from '../../types/metadata';
 
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
@@ -20,9 +20,22 @@ export const QueryPage: React.FC = () => {
   // Use global database context
   const { databases, selectedDatabase, loading: loadingDatabases } = useDatabase();
   
-  // Metadata state
-  const [metadata, setMetadata] = useState<TableMetadata[] | null>(null);
+  // Metadata state - use table summaries initially, load details on demand
+  const [tableSummaries, setTableSummaries] = useState<TableSummary[] | null>(null);
+  const [tableDetails, setTableDetails] = useState<Map<string, TableMetadata>>(new Map());
   const [metadataLoading, setMetadataLoading] = useState(false);
+  
+  // Convert to TableMetadata[] for backward compatibility
+  const metadata: TableMetadata[] | null = tableSummaries
+    ? tableSummaries.map(summary => {
+        const key = `${summary.schemaName}.${summary.tableName}`;
+        const details = tableDetails.get(key);
+        return details || {
+          ...summary,
+          columns: [],
+        };
+      })
+    : null;
   
   // Query state
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM ');
@@ -35,36 +48,55 @@ export const QueryPage: React.FC = () => {
   const [llmUnavailable, setLlmUnavailable] = useState(false);
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
 
-  // Load metadata when database changes
+  // Load table list when database changes (without column details)
   useEffect(() => {
     if (!selectedDatabase) {
-      setMetadata(null);
+      setTableSummaries(null);
+      setTableDetails(new Map());
       return;
     }
 
-    const loadMetadata = async () => {
+    const loadTableList = async () => {
       try {
         setMetadataLoading(true);
-        const response = await apiClient.getDatabaseMetadata(selectedDatabase);
-        setMetadata(response.tables || []);
+        const response = await apiClient.getTableList(selectedDatabase);
+        setTableSummaries(response.tables || []);
+        setTableDetails(new Map()); // Clear previous details
       } catch (err) {
-        console.error('Failed to load metadata:', err);
-        setMetadata([]);
+        console.error('Failed to load table list:', err);
+        setTableSummaries([]);
       } finally {
         setMetadataLoading(false);
       }
     };
 
-    loadMetadata();
+    loadTableList();
   }, [selectedDatabase]);
+
+  // Load table details on demand
+  const loadTableDetails = async (schemaName: string, tableName: string) => {
+    if (!selectedDatabase) return;
+    
+    const key = `${schemaName}.${tableName}`;
+    // Skip if already loaded
+    if (tableDetails.has(key)) return;
+    
+    try {
+      const details = await apiClient.getTableDetails(selectedDatabase, schemaName, tableName);
+      setTableDetails(prev => new Map(prev).set(key, details));
+    } catch (err) {
+      console.error(`Failed to load table details for ${key}:`, err);
+    }
+  };
 
   const handleRefreshMetadata = async () => {
     if (!selectedDatabase) return;
     
     try {
       setMetadataLoading(true);
-      const response = await apiClient.refreshDatabaseMetadata(selectedDatabase);
-      setMetadata(response.tables || []);
+      const response = await apiClient.getTableList(selectedDatabase, true);
+      setTableSummaries(response.tables || []);
+      setTableDetails(new Map()); // Clear cached details
       message.success('Schema refreshed');
     } catch (err) {
       message.error('Failed to refresh schema');
@@ -243,6 +275,7 @@ export const QueryPage: React.FC = () => {
           metadataLoading={metadataLoading}
           onTableSelect={handleTableSelect}
           onRefreshMetadata={handleRefreshMetadata}
+          onLoadTableDetails={loadTableDetails}
         />
       </Sider>
 

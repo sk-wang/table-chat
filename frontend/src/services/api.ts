@@ -10,7 +10,7 @@ import type {
   QueryRequest,
   QueryResponse,
 } from '../types';
-import type { DatabaseMetadata } from '../types/metadata';
+import type { DatabaseMetadata, TableListResponse, TableMetadata } from '../types/metadata';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888';
 
@@ -116,6 +116,33 @@ class ApiClient {
     try {
       const response: AxiosResponse<DatabaseMetadata> = await this.client.post(
         `/dbs/${dbName}/metadata/refresh`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async getTableList(dbName: string, refresh = false): Promise<TableListResponse> {
+    try {
+      const response: AxiosResponse<TableListResponse> = await this.client.get(
+        `/dbs/${dbName}/metadata/tables`,
+        { params: { refresh } }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async getTableDetails(
+    dbName: string,
+    schemaName: string,
+    tableName: string
+  ): Promise<TableMetadata> {
+    try {
+      const response: AxiosResponse<TableMetadata> = await this.client.get(
+        `/dbs/${dbName}/metadata/tables/${schemaName}/${tableName}`
       );
       return response.data;
     } catch (error) {

@@ -51,6 +51,7 @@ interface DatabaseSidebarProps {
   metadataLoading: boolean;
   onTableSelect?: (schemaName: string, tableName: string) => void;
   onRefreshMetadata?: () => void;
+  onLoadTableDetails?: (schemaName: string, tableName: string) => void;
 }
 
 const { Text } = Typography;
@@ -78,6 +79,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   metadataLoading,
   onTableSelect,
   onRefreshMetadata,
+  onLoadTableDetails,
 }) => {
   const { 
     databases, 
@@ -206,6 +208,28 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
       const table = parts.slice(1).join('-');
       onTableSelect?.(schema, table);
     }
+  };
+
+  const handleTreeExpand = (expandedKeys: React.Key[]) => {
+    // When a table node is expanded, load its details if not already loaded
+    expandedKeys.forEach(key => {
+      const keyStr = key as string;
+      if (keyStr.startsWith('table-') && !keyStr.startsWith('column-')) {
+        const parts = keyStr.replace('table-', '').split('-');
+        const schema = parts[0];
+        const table = parts.slice(1).join('-');
+        
+        // Check if this table has columns loaded
+        const tableMetadata = metadata?.find(
+          t => t.schemaName === schema && t.tableName === table
+        );
+        
+        // Load details if columns are empty (not loaded yet)
+        if (tableMetadata && (!tableMetadata.columns || tableMetadata.columns.length === 0)) {
+          onLoadTableDetails?.(schema, table);
+        }
+      }
+    });
   };
 
   // Custom panel header for Databases
@@ -462,6 +486,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
                 defaultExpandAll
                 treeData={buildMetadataTree()}
                 onSelect={handleTreeSelect}
+                onExpand={handleTreeExpand}
                 style={{
                   background: 'transparent',
                   fontSize: 12,

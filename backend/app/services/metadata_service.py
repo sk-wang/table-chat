@@ -4,7 +4,13 @@ from datetime import datetime
 from typing import Any
 
 from app.db.sqlite import db_manager
-from app.models.metadata import ColumnInfo, TableMetadata, DatabaseMetadata
+from app.models.metadata import (
+    ColumnInfo,
+    TableMetadata,
+    TableSummary,
+    DatabaseMetadata,
+    TableListResponse,
+)
 from app.services.db_manager import database_manager
 from app.connectors.factory import ConnectorFactory
 
@@ -168,6 +174,69 @@ class MetadataService:
 
         # Refresh from database
         return await self.refresh_metadata(db_name)
+
+    async def get_table_list(self, db_name: str, force_refresh: bool = False) -> TableListResponse:
+        """
+        Get table list without column details (lightweight).
+        
+        Args:
+            db_name: Database connection name
+            force_refresh: Force refresh from database
+            
+        Returns:
+            TableListResponse with tables (no columns)
+        """
+        # Get full metadata (we'll strip columns)
+        metadata = await self.get_or_refresh_metadata(db_name, force_refresh=force_refresh)
+        
+        # Convert to table summaries (without columns)
+        table_summaries = [
+            TableSummary(
+                schema_name=table.schema_name,
+                table_name=table.table_name,
+                table_type=table.table_type,
+                comment=table.comment,
+            )
+            for table in metadata.tables
+        ]
+        
+        return TableListResponse(
+            name=metadata.name,
+            schemas=metadata.schemas,
+            tables=table_summaries,
+            last_refreshed=metadata.last_refreshed,
+        )
+
+    async def get_table_details(
+        self, db_name: str, schema_name: str, table_name: str
+    ) -> TableMetadata | None:
+        """
+        Get detailed metadata for a specific table.
+        
+        Args:
+            db_name: Database connection name
+            schema_name: Schema name
+            table_name: Table name
+            
+        Returns:
+            TableMetadata with columns, or None if not found
+        """
+        # Get cached metadata
+        metadata = await self.get_cached_metadata(db_name)
+        
+        if not metadata:
+            # Try to refresh if not cached
+            try:
+                metadata = await self.refresh_metadata(db_name)
+            except Exception:
+                return None
+        
+        # Find the specific table
+        for table in metadata.tables:
+            if table.schema_name == schema_name and table.table_name == table_name:
+                return table
+        
+        return None
 
 
 # Global instance

@@ -16,7 +16,7 @@ export interface NaturalQueryRequest {
 // === Response Types ===
 
 // Re-export metadata types from metadata.ts to avoid duplication
-export type { ColumnInfo, TableMetadata, DatabaseMetadata } from './metadata';
+export type { ColumnInfo, TableSummary, TableMetadata, DatabaseMetadata, TableListResponse } from './metadata';
 
 export interface DatabaseResponse {
   name: string;

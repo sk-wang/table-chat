@@ -11,7 +11,7 @@ from app.models.database import (
     mask_password_in_url,
 )
 from app.models.error import ErrorResponse
-from app.models.metadata import DatabaseMetadata
+from app.models.metadata import DatabaseMetadata, TableListResponse, TableMetadata
 from app.services.db_manager import database_manager
 from app.services.metadata_service import metadata_service
 
@@ -144,6 +144,96 @@ async def refresh_database_metadata(name: str) -> DatabaseMetadata:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Failed to refresh metadata: {e}",
+        ) from e
+
+
+@router.get(
+    "/{name}/metadata/tables",
+    response_model=TableListResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Database not found"},
+        503: {"model": ErrorResponse, "description": "Failed to fetch metadata"},
+    },
+    summary="Get table list (without column details)",
+)
+async def get_table_list(
+    name: str,
+    refresh: bool = Query(False, description="Force refresh from database"),
+) -> TableListResponse:
+    """
+    Get list of tables without column details (lightweight).
+    
+    Use this endpoint for initial loading to reduce data transfer.
+    Then use /dbs/{name}/metadata/tables/{schema}/{table} to get column details when needed.
+    """
+    # First verify the database exists
+    db = await database_manager.get_database(name)
+    if not db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Database '{name}' not found",
+        )
+
+    try:
+        table_list = await metadata_service.get_table_list(name, force_refresh=refresh)
+        return table_list
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to fetch table list: {e}",
+        ) from e
+
+
+@router.get(
+    "/{name}/metadata/tables/{schema_name}/{table_name}",
+    response_model=TableMetadata,
+    responses={
+        404: {"model": ErrorResponse, "description": "Database or table not found"},
+        503: {"model": ErrorResponse, "description": "Failed to fetch table details"},
+    },
+    summary="Get table details with columns",
+)
+async def get_table_details(
+    name: str,
+    schema_name: str,
+    table_name: str,
+) -> TableMetadata:
+    """
+    Get detailed metadata for a specific table including all columns.
+    
+    Use this endpoint after getting the table list to fetch column details on demand.
+    """
+    # First verify the database exists
+    db = await database_manager.get_database(name)
+    if not db:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Database '{name}' not found",
+        )
+
+    try:
+        table_details = await metadata_service.get_table_details(
+            name, schema_name, table_name
+        )
+        
+        if not table_details:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Table '{schema_name}.{table_name}' not found in database '{name}'",
+            )
+        
+        return table_details
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Failed to fetch table details: {e}",
         ) from e
 
 
