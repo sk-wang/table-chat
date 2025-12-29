@@ -51,14 +51,17 @@ RULES:
 6. Handle NULL values appropriately.
 7. Use proper JOIN syntax when relating tables.
 8. Use PostgreSQL-specific functions and operators when appropriate.
+9. Recognize export intent: If the user mentions "导出", "export", "下载", "download", "保存为", "save as" with a format (csv/json/excel/xlsx), set the export_format field.
 
 OUTPUT FORMAT:
-Return a JSON object with two fields:
+Return a JSON object with three fields:
 - "sql": The generated SQL query
 - "explanation": A brief explanation of what the query does (in Chinese)
+- "export_format": (optional) One of "csv", "json", or "xlsx" if export intent is detected, otherwise null
 
-Example output:
-{"sql": "SELECT * FROM public.users WHERE age > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户"}
+Example outputs:
+{"sql": "SELECT * FROM public.users WHERE age > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户", "export_format": null}
+{"sql": "SELECT * FROM public.orders LIMIT 1000", "explanation": "查询订单数据并导出为CSV", "export_format": "csv"}
 """,
             "user_suffix": "Generate a PostgreSQL SELECT query for this request.",
         },
@@ -75,14 +78,17 @@ RULES:
 7. Use proper JOIN syntax when relating tables.
 8. Use MySQL-specific functions when appropriate (e.g., IFNULL, COALESCE, DATE_FORMAT).
 9. For LIMIT with offset, use LIMIT offset, count syntax.
+10. Recognize export intent: If the user mentions "导出", "export", "下载", "download", "保存为", "save as" with a format (csv/json/excel/xlsx), set the export_format field.
 
 OUTPUT FORMAT:
-Return a JSON object with two fields:
+Return a JSON object with three fields:
 - "sql": The generated SQL query
 - "explanation": A brief explanation of what the query does (in Chinese)
+- "export_format": (optional) One of "csv", "json", or "xlsx" if export intent is detected, otherwise null
 
-Example output:
-{"sql": "SELECT * FROM `users` WHERE `age` > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户"}
+Example outputs:
+{"sql": "SELECT * FROM `users` WHERE `age` > 18 LIMIT 100", "explanation": "查询所有年龄大于18岁的用户", "export_format": null}
+{"sql": "SELECT * FROM `orders` LIMIT 1000", "explanation": "查询订单数据并导出为Excel", "export_format": "xlsx"}
 """,
             "user_suffix": "Generate a MySQL SELECT query for this request.",
         },
@@ -337,7 +343,7 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
         db_name: str,
         prompt: str,
         db_type: str = "postgresql",
-    ) -> tuple[str, str | None]:
+    ) -> tuple[str, str | None, str | None]:
         """
         Generate SQL from natural language prompt using prompt chain.
         
@@ -350,7 +356,8 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
             db_type: Database type ('postgresql' or 'mysql')
 
         Returns:
-            Tuple of (generated_sql, explanation)
+            Tuple of (generated_sql, explanation, export_format)
+            export_format will be 'csv', 'json', 'xlsx', or None
 
         Raises:
             ValueError: If LLM is not configured
@@ -412,17 +419,25 @@ User Request: {prompt}
                 result = json.loads(content)
                 sql = result.get("sql", "")
                 explanation = result.get("explanation", None)
+                export_format = result.get("export_format", None)
+                
+                # Validate export_format if present
+                if export_format and export_format not in ["csv", "json", "xlsx"]:
+                    logger.warning(f"Invalid export_format '{export_format}', ignoring")
+                    export_format = None
+                    
             except json.JSONDecodeError:
                 # If not valid JSON, try to extract SQL directly
                 sql = content
                 explanation = None
+                export_format = None
 
             # Validate that it's a SELECT query
             sql_upper = sql.strip().upper()
             if not sql_upper.startswith("SELECT"):
                 raise ValueError(f"Generated query is not a SELECT statement: {sql[:50]}...")
 
-            return sql, explanation
+            return sql, explanation, export_format
 
         except Exception as e:
             raise ValueError(f"LLM generation failed: {e}") from e

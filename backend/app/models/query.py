@@ -1,5 +1,7 @@
 """Query-related models."""
 
+from typing import Literal
+
 from pydantic import Field
 
 from app.models.base import CamelModel
@@ -45,4 +47,7 @@ class NaturalQueryResponse(CamelModel):
 
     generated_sql: str = Field(..., description="Generated SQL statement")
     explanation: str | None = Field(None, description="Explanation of the generated SQL")
+    export_format: Literal["csv", "json", "xlsx"] | None = Field(
+        None, description="Export format if export intent was detected"
+    )
 

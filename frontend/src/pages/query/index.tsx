@@ -8,6 +8,7 @@ import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInp
 import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { ResizableSplitPane } from '../../components/layout/ResizableSplitPane';
 import { QueryHistoryTab } from '../../components/history';
+import { ExportButton } from '../../components/export';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import {
@@ -265,6 +266,27 @@ export const QueryPage: React.FC = () => {
       
       // Trigger history refresh
       setHistoryRefreshKey(prev => prev + 1);
+      
+      // Check if there's a pending export format
+      const pendingExport = sessionStorage.getItem('pendingExportFormat');
+      if (pendingExport && response.result.rows.length > 0) {
+        // Clear the pending export
+        sessionStorage.removeItem('pendingExportFormat');
+        
+        // Trigger export using the ExportButton functionality
+        const { exportQueryResult } = await import('../../components/export');
+        try {
+          await exportQueryResult(
+            selectedDatabase,
+            pendingExport as 'csv' | 'json' | 'xlsx',
+            response.result.columns,
+            response.result.rows
+          );
+          message.success(`已自动导出为 ${pendingExport.toUpperCase()}`);
+        } catch (exportError) {
+          message.error(`自动导出失败: ${exportError instanceof Error ? exportError.message : '未知错误'}`);
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Query execution failed');
       setResult(null);
@@ -308,7 +330,16 @@ export const QueryPage: React.FC = () => {
       // Switch to SQL tab to show the generated query
       setQueryMode('sql');
       
-      message.success('SQL 生成成功！您可以检查并执行生成的查询。');
+      // Check if export format was detected
+      if (response.exportFormat) {
+        message.success(`SQL 生成成功！检测到导出意图，将在执行后自动导出为 ${response.exportFormat.toUpperCase()}`);
+        
+        // Store export format for auto-export after execution
+        // We'll use a ref or state to track this
+        sessionStorage.setItem('pendingExportFormat', response.exportFormat);
+      } else {
+        message.success('SQL 生成成功！您可以检查并执行生成的查询。');
+      }
 
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'SQL generation failed';
@@ -415,13 +446,26 @@ export const QueryPage: React.FC = () => {
         </span>
       ),
       children: (
-        <div style={{ flex: 1, height: '100%', overflow: 'auto' }}>
-          <QueryResultTable
-            result={result}
-            executionTimeMs={executionTimeMs}
-            loading={executing}
-            metadata={metadata}
-          />
+        <div style={{ flex: 1, height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          {/* 导出按钮工具栏 */}
+          {result && result.rows && result.rows.length > 0 && (
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid #323232', display: 'flex', justifyContent: 'flex-end' }}>
+              <ExportButton
+                result={result}
+                dbName={selectedDatabase || 'unknown'}
+                disabled={executing}
+              />
+            </div>
+          )}
+          {/* 查询结果表格 */}
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <QueryResultTable
+              result={result}
+              executionTimeMs={executionTimeMs}
+              loading={executing}
+              metadata={metadata}
+            />
+          </div>
         </div>
       ),
     },

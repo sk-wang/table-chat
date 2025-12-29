@@ -139,7 +139,7 @@ async def natural_language_query(
         ) from e
 
     try:
-        generated_sql, explanation = await llm_service.generate_sql(
+        generated_sql, explanation, export_format = await llm_service.generate_sql(
             db_name=name,
             prompt=request.prompt,
             db_type=db_info.get("db_type", "postgresql"),
@@ -148,6 +148,7 @@ async def natural_language_query(
         return NaturalQueryResponse(
             generated_sql=generated_sql,
             explanation=explanation,
+            export_format=export_format,
         )
 
     except ValueError as e:

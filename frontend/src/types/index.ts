@@ -48,6 +48,8 @@ export interface QueryResponse {
 export interface NaturalQueryResponse {
   generatedSql: string;
   explanation?: string;
+  /** 导出格式，当识别到导出意图时返回 */
+  exportFormat?: 'csv' | 'json' | 'xlsx' | null;
 }
 
 export interface ErrorResponse {
