@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Typography, Alert, Tabs, message, Layout } from 'antd';
+import { Typography, Alert, Tabs, Layout, App } from 'antd';
 import { CodeOutlined, RobotOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
@@ -17,6 +17,9 @@ const { Sider, Content } = Layout;
 type QueryMode = 'sql' | 'natural';
 
 export const QueryPage: React.FC = () => {
+  // Ant Design App context for message API
+  const { message } = App.useApp();
+  
   // Use global database context
   const { databases, selectedDatabase, loading: loadingDatabases } = useDatabase();
   

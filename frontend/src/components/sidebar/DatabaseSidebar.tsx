@@ -3,11 +3,11 @@ import {
   Typography,
   Button,
   Popconfirm,
-  message,
   Spin,
   Tooltip,
   Tree,
   Collapse,
+  App,
 } from 'antd';
 import {
   DatabaseOutlined,
@@ -81,6 +81,9 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   onRefreshMetadata,
   onLoadTableDetails,
 }) => {
+  // Ant Design App context for message API
+  const { message } = App.useApp();
+  
   const { 
     databases, 
     selectedDatabase, 

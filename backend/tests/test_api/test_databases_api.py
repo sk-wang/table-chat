@@ -243,3 +243,147 @@ class TestDatabasesAPIWithMocks:
             assert response.status_code == 503
             assert "Failed to refresh metadata" in response.json()["detail"]
 
+
+class TestTableListAPI:
+    """Test table list API endpoints (lightweight metadata)."""
+
+    def test_get_table_list_success(self, test_client):
+        """Test getting table list without column details."""
+        from app.models.metadata import TableListResponse, TableSummary
+
+        mock_table_list = TableListResponse(
+            name="mydb",
+            schemas=["public"],
+            tables=[
+                TableSummary(
+                    schema_name="public",
+                    table_name="users",
+                    table_type="table",
+                    comment="用户表",
+                ),
+                TableSummary(
+                    schema_name="public",
+                    table_name="orders",
+                    table_type="table",
+                    comment="订单表",
+                ),
+            ],
+            last_refreshed="2025-01-01T00:00:00",
+        )
+
+        with patch("app.api.v1.dbs.database_manager") as mock_db_mgr, \
+             patch("app.api.v1.dbs.metadata_service") as mock_meta_svc:
+            mock_db_mgr.get_database = AsyncMock(return_value={"name": "mydb"})
+            mock_meta_svc.get_table_list = AsyncMock(return_value=mock_table_list)
+
+            response = test_client.get("/api/v1/dbs/mydb/metadata/tables")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["name"] == "mydb"
+            assert len(data["tables"]) == 2
+            assert data["tables"][0]["tableName"] == "users"
+            # Verify no columns in response (lightweight)
+            assert "columns" not in data["tables"][0]
+
+    def test_get_table_list_not_found(self, test_client):
+        """Test getting table list for non-existent database."""
+        with patch("app.api.v1.dbs.database_manager") as mock_mgr:
+            mock_mgr.get_database = AsyncMock(return_value=None)
+
+            response = test_client.get("/api/v1/dbs/nonexistent/metadata/tables")
+
+            assert response.status_code == 404
+
+    def test_get_table_list_with_refresh(self, test_client):
+        """Test getting table list with refresh parameter."""
+        from app.models.metadata import TableListResponse
+
+        mock_table_list = TableListResponse(
+            name="mydb",
+            schemas=[],
+            tables=[],
+        )
+
+        with patch("app.api.v1.dbs.database_manager") as mock_db_mgr, \
+             patch("app.api.v1.dbs.metadata_service") as mock_meta_svc:
+            mock_db_mgr.get_database = AsyncMock(return_value={"name": "mydb"})
+            mock_meta_svc.get_table_list = AsyncMock(return_value=mock_table_list)
+
+            response = test_client.get("/api/v1/dbs/mydb/metadata/tables?refresh=true")
+
+            assert response.status_code == 200
+            # Verify refresh=true was passed
+            mock_meta_svc.get_table_list.assert_called_once_with("mydb", force_refresh=True)
+
+
+class TestTableDetailsAPI:
+    """Test table details API endpoints (with columns)."""
+
+    def test_get_table_details_success(self, test_client):
+        """Test getting table details with columns."""
+        from app.models.metadata import TableMetadata, ColumnInfo
+
+        mock_table = TableMetadata(
+            schema_name="public",
+            table_name="users",
+            table_type="table",
+            columns=[
+                ColumnInfo(name="id", data_type="integer", is_nullable=False, is_primary_key=True),
+                ColumnInfo(name="name", data_type="varchar", is_nullable=True),
+                ColumnInfo(name="email", data_type="varchar", is_nullable=False),
+            ],
+            comment="用户表",
+        )
+
+        with patch("app.api.v1.dbs.database_manager") as mock_db_mgr, \
+             patch("app.api.v1.dbs.metadata_service") as mock_meta_svc:
+            mock_db_mgr.get_database = AsyncMock(return_value={"name": "mydb"})
+            mock_meta_svc.get_table_details = AsyncMock(return_value=mock_table)
+
+            response = test_client.get("/api/v1/dbs/mydb/metadata/tables/public/users")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["schemaName"] == "public"
+            assert data["tableName"] == "users"
+            assert len(data["columns"]) == 3
+            assert data["columns"][0]["name"] == "id"
+            assert data["columns"][0]["isPrimaryKey"] is True
+
+    def test_get_table_details_not_found_db(self, test_client):
+        """Test getting table details for non-existent database."""
+        with patch("app.api.v1.dbs.database_manager") as mock_mgr:
+            mock_mgr.get_database = AsyncMock(return_value=None)
+
+            response = test_client.get("/api/v1/dbs/nonexistent/metadata/tables/public/users")
+
+            assert response.status_code == 404
+            assert "not found" in response.json()["detail"].lower()
+
+    def test_get_table_details_not_found_table(self, test_client):
+        """Test getting details for non-existent table."""
+        with patch("app.api.v1.dbs.database_manager") as mock_db_mgr, \
+             patch("app.api.v1.dbs.metadata_service") as mock_meta_svc:
+            mock_db_mgr.get_database = AsyncMock(return_value={"name": "mydb"})
+            mock_meta_svc.get_table_details = AsyncMock(return_value=None)
+
+            response = test_client.get("/api/v1/dbs/mydb/metadata/tables/public/nonexistent")
+
+            assert response.status_code == 404
+            assert "public.nonexistent" in response.json()["detail"]
+
+    def test_get_table_details_service_error(self, test_client):
+        """Test table details fetch when service fails."""
+        with patch("app.api.v1.dbs.database_manager") as mock_db_mgr, \
+             patch("app.api.v1.dbs.metadata_service") as mock_meta_svc:
+            mock_db_mgr.get_database = AsyncMock(return_value={"name": "mydb"})
+            mock_meta_svc.get_table_details = AsyncMock(
+                side_effect=Exception("Connection timeout")
+            )
+
+            response = test_client.get("/api/v1/dbs/mydb/metadata/tables/public/users")
+
+            assert response.status_code == 503
+            assert "Failed to fetch table details" in response.json()["detail"]
+

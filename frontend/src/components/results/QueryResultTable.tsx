@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Table, Alert, Empty, Typography, Tooltip } from 'antd';
 import { ClockCircleOutlined, WarningOutlined } from '@ant-design/icons';
-import { Resizable, ResizeCallbackData } from 'react-resizable';
+import { Resizable } from 'react-resizable';
+import type { ResizeCallbackData } from 'react-resizable';
 import type { QueryResult } from '../../types';
 import type { TableMetadata, ColumnInfo } from '../../types/metadata';
 import 'react-resizable/css/styles.css';

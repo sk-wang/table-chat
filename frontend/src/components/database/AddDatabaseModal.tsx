@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, message, Radio, Space, Typography, Checkbox } from 'antd';
+import { Modal, Form, Input, Radio, Space, Typography, Checkbox, App } from 'antd';
 import type { DatabaseResponse } from '../../types';
 import { apiClient } from '../../services/api';
 
@@ -40,6 +40,9 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
   onSuccess,
   editingDatabase,
 }) => {
+  // Ant Design App context for message API
+  const { message } = App.useApp();
+  
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [dbType, setDbType] = useState<DbType>('postgresql');

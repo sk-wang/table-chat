@@ -184,7 +184,7 @@ class TestMetadataService:
     async def test_fetch_metadata_database_not_found(self, service):
         """Test fetch_metadata raises when database not found."""
         with patch("app.services.metadata_service.database_manager") as mock_mgr:
-            mock_mgr.get_connection = AsyncMock(side_effect=ValueError("Database 'testdb' not found"))
+            mock_mgr.get_database = AsyncMock(return_value=None)
 
             with pytest.raises(ValueError, match="Database 'testdb' not found"):
                 await service.fetch_metadata("testdb")
@@ -288,3 +288,223 @@ class TestMetadataService:
             assert result is not None
             assert result.tables[0].comment is None
             assert result.tables[0].columns[0].comment is None
+
+
+class TestTableListService:
+    """Test suite for MetadataService.get_table_list method."""
+
+    @pytest.fixture
+    def service(self):
+        """Create a fresh MetadataService instance."""
+        return MetadataService()
+
+    @pytest.fixture
+    def sample_metadata(self):
+        """Create sample DatabaseMetadata for testing."""
+        columns = [
+            ColumnInfo(
+                name="id",
+                data_type="integer",
+                is_nullable=False,
+                is_primary_key=True,
+            ),
+            ColumnInfo(
+                name="name",
+                data_type="varchar",
+                is_nullable=True,
+                is_primary_key=False,
+            ),
+        ]
+        tables = [
+            TableMetadata(
+                schema_name="public",
+                table_name="users",
+                table_type="table",
+                columns=columns,
+                comment="用户表",
+            ),
+            TableMetadata(
+                schema_name="public",
+                table_name="orders",
+                table_type="table",
+                columns=columns,
+                comment="订单表",
+            ),
+        ]
+        return DatabaseMetadata(
+            name="testdb",
+            schemas=["public"],
+            tables=tables,
+            last_refreshed="2024-01-01T00:00:00",
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_table_list_returns_summary_without_columns(self, service, sample_metadata):
+        """Test that get_table_list returns TableSummary without columns."""
+        with patch.object(service, "get_or_refresh_metadata", new_callable=AsyncMock) as mock_meta:
+            mock_meta.return_value = sample_metadata
+
+            result = await service.get_table_list("testdb")
+
+            assert result is not None
+            assert result.name == "testdb"
+            assert len(result.tables) == 2
+            # Verify it's TableSummary (no columns attribute)
+            assert not hasattr(result.tables[0], "columns") or result.tables[0].columns is None
+            assert result.tables[0].table_name == "users"
+            assert result.tables[0].comment == "用户表"
+
+    @pytest.mark.asyncio
+    async def test_get_table_list_with_force_refresh(self, service, sample_metadata):
+        """Test get_table_list with force_refresh=True."""
+        with patch.object(service, "get_or_refresh_metadata", new_callable=AsyncMock) as mock_meta:
+            mock_meta.return_value = sample_metadata
+
+            await service.get_table_list("testdb", force_refresh=True)
+
+            mock_meta.assert_called_once_with("testdb", force_refresh=True)
+
+    @pytest.mark.asyncio
+    async def test_get_table_list_empty_when_no_tables(self, service):
+        """Test get_table_list returns empty list when metadata has no tables."""
+        empty_metadata = DatabaseMetadata(name="testdb", schemas=[], tables=[])
+        
+        with patch.object(service, "get_or_refresh_metadata", new_callable=AsyncMock) as mock_meta:
+            mock_meta.return_value = empty_metadata
+
+            result = await service.get_table_list("testdb")
+
+            assert result is not None
+            assert result.name == "testdb"
+            assert len(result.tables) == 0
+
+
+class TestTableDetailsService:
+    """Test suite for MetadataService.get_table_details method."""
+
+    @pytest.fixture
+    def service(self):
+        """Create a fresh MetadataService instance."""
+        return MetadataService()
+
+    @pytest.fixture
+    def sample_metadata(self):
+        """Create sample DatabaseMetadata for testing."""
+        users_columns = [
+            ColumnInfo(
+                name="id",
+                data_type="integer",
+                is_nullable=False,
+                is_primary_key=True,
+            ),
+            ColumnInfo(
+                name="name",
+                data_type="varchar",
+                is_nullable=True,
+                is_primary_key=False,
+            ),
+        ]
+        orders_columns = [
+            ColumnInfo(
+                name="order_id",
+                data_type="integer",
+                is_nullable=False,
+                is_primary_key=True,
+            ),
+        ]
+        tables = [
+            TableMetadata(
+                schema_name="public",
+                table_name="users",
+                table_type="table",
+                columns=users_columns,
+                comment="用户表",
+            ),
+            TableMetadata(
+                schema_name="sales",
+                table_name="orders",
+                table_type="table",
+                columns=orders_columns,
+                comment="订单表",
+            ),
+        ]
+        return DatabaseMetadata(
+            name="testdb",
+            schemas=["public", "sales"],
+            tables=tables,
+            last_refreshed="2024-01-01T00:00:00",
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_returns_full_table(self, service, sample_metadata):
+        """Test that get_table_details returns TableMetadata with columns."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache:
+            mock_cache.return_value = sample_metadata
+
+            result = await service.get_table_details("testdb", "public", "users")
+
+            assert result is not None
+            assert result.schema_name == "public"
+            assert result.table_name == "users"
+            assert result.comment == "用户表"
+            assert len(result.columns) == 2
+            assert result.columns[0].name == "id"
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_different_schema(self, service, sample_metadata):
+        """Test get_table_details finds table in different schema."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache:
+            mock_cache.return_value = sample_metadata
+
+            result = await service.get_table_details("testdb", "sales", "orders")
+
+            assert result is not None
+            assert result.schema_name == "sales"
+            assert result.table_name == "orders"
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_not_found(self, service, sample_metadata):
+        """Test get_table_details returns None when table not found."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache:
+            mock_cache.return_value = sample_metadata
+
+            result = await service.get_table_details("testdb", "public", "nonexistent")
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_wrong_schema(self, service, sample_metadata):
+        """Test get_table_details returns None when schema doesn't match."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache:
+            mock_cache.return_value = sample_metadata
+
+            # users is in public, not sales
+            result = await service.get_table_details("testdb", "sales", "users")
+
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_refreshes_when_no_cache(self, service, sample_metadata):
+        """Test get_table_details refreshes when no cache exists."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache, \
+             patch.object(service, "refresh_metadata", new_callable=AsyncMock) as mock_refresh:
+            mock_cache.return_value = None
+            mock_refresh.return_value = sample_metadata
+
+            result = await service.get_table_details("testdb", "public", "users")
+
+            mock_refresh.assert_called_once_with("testdb")
+            assert result is not None
+            assert result.table_name == "users"
+
+    @pytest.mark.asyncio
+    async def test_get_table_details_returns_none_when_refresh_fails(self, service):
+        """Test get_table_details returns None when refresh fails."""
+        with patch.object(service, "get_cached_metadata", new_callable=AsyncMock) as mock_cache, \
+             patch.object(service, "refresh_metadata", new_callable=AsyncMock) as mock_refresh:
+            mock_cache.return_value = None
+            mock_refresh.side_effect = Exception("Connection failed")
+
+            result = await service.get_table_details("testdb", "public", "users")
+
+            assert result is None

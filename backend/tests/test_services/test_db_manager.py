@@ -110,9 +110,12 @@ class TestDatabaseManager:
                 "name": "testdb",
                 "url": "postgresql://localhost/testdb",
                 "db_type": "postgresql",
+                "ssl_disabled": False,
             })
 
             await manager.create_or_update_database("testdb", "postgresql://localhost/testdb")
 
             mock_connector.test_connection.assert_called_once()
-            mock_db.create_or_update_database.assert_called_once_with("testdb", "postgresql://localhost/testdb", "postgresql")
+            mock_db.create_or_update_database.assert_called_once_with(
+                "testdb", "postgresql://localhost/testdb", "postgresql", False
+            )
