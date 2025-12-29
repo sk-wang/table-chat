@@ -141,8 +141,8 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     return metadata?.length || 0;
   }, [metadata]);
 
-  // Build tree data for metadata with columns
-  const buildMetadataTree = (): DataNode[] => {
+  // Build tree data for metadata with columns - memoized to prevent re-renders
+  const treeData = useMemo((): DataNode[] => {
     if (!displayTables || displayTables.length === 0) return [];
 
     // Group by schema
@@ -199,7 +199,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
         })),
       })),
     }));
-  };
+  }, [displayTables]);
 
   const handleTreeSelect = (selectedKeys: React.Key[]) => {
     if (selectedKeys.length === 0) return;
@@ -486,8 +486,8 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
             ) : displayTables && tableCount > 0 ? (
               <Tree
                 showIcon
-                defaultExpandAll
-                treeData={buildMetadataTree()}
+                defaultExpandedKeys={treeData.map(node => node.key as string)}
+                treeData={treeData}
                 onSelect={handleTreeSelect}
                 onExpand={handleTreeExpand}
                 style={{
