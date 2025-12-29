@@ -106,3 +106,120 @@ class TestQueryServiceAsync:
             # The important part is that the code path exists
             pass
 
+
+@pytest.mark.asyncio
+class TestQueryServiceWithMocks:
+    """Async test suite for QueryService with mocked dependencies."""
+
+    async def test_execute_query_postgresql(self):
+        """Test execute_query for PostgreSQL database."""
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        mock_db = {
+            "url": "postgresql://localhost/testdb",
+            "db_type": "postgresql",
+            "ssl_disabled": False,
+        }
+        mock_connector = MagicMock()
+        mock_connector.execute_query = AsyncMock(return_value=(["id", "name"], [{"id": 1, "name": "Test"}], 10))
+
+        with patch("app.services.query_service.database_manager") as mock_mgr, \
+             patch("app.services.query_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            columns, rows, exec_time = await query_service.execute_query("testdb", "SELECT * FROM users")
+
+            assert columns == ["id", "name"]
+            assert len(rows) == 1
+            assert exec_time == 10
+            # PostgreSQL should not pass ssl_disabled
+            mock_connector.execute_query.assert_called_once_with("postgresql://localhost/testdb", "SELECT * FROM users")
+
+    async def test_execute_query_mysql_with_ssl_disabled(self):
+        """Test execute_query for MySQL database with ssl_disabled."""
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        mock_db = {
+            "url": "mysql://localhost/testdb",
+            "db_type": "mysql",
+            "ssl_disabled": 1,  # SQLite stores as integer
+        }
+        mock_connector = MagicMock()
+        mock_connector.execute_query = AsyncMock(return_value=(["id"], [{"id": 1}], 5))
+
+        with patch("app.services.query_service.database_manager") as mock_mgr, \
+             patch("app.services.query_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            columns, rows, exec_time = await query_service.execute_query("testdb", "SELECT 1")
+
+            # MySQL should pass ssl_disabled=True
+            mock_connector.execute_query.assert_called_once_with("mysql://localhost/testdb", "SELECT 1", True)
+
+    async def test_execute_validated_query_postgresql_success(self):
+        """Test execute_validated_query for PostgreSQL."""
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        mock_db = {
+            "url": "postgresql://localhost/testdb",
+            "db_type": "postgresql",
+            "ssl_disabled": False,
+        }
+        mock_connector = MagicMock()
+        mock_connector.get_dialect.return_value = "postgres"
+        mock_connector.execute_query = AsyncMock(return_value=(["id"], [{"id": 1}], 5))
+
+        with patch("app.services.query_service.database_manager") as mock_mgr, \
+             patch("app.services.query_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            final_sql, columns, rows, exec_time, truncated = await query_service.execute_validated_query(
+                "testdb", "SELECT * FROM users"
+            )
+
+            assert "SELECT" in final_sql
+            assert "LIMIT 1000" in final_sql
+            assert truncated is True
+
+    async def test_execute_validated_query_mysql_success(self):
+        """Test execute_validated_query for MySQL with ssl_disabled."""
+        from unittest.mock import AsyncMock, patch, MagicMock
+
+        mock_db = {
+            "url": "mysql://localhost/testdb",
+            "db_type": "mysql",
+            "ssl_disabled": 1,
+        }
+        mock_connector = MagicMock()
+        mock_connector.get_dialect.return_value = "mysql"
+        mock_connector.execute_query = AsyncMock(return_value=(["id"], [{"id": 1}], 5))
+
+        with patch("app.services.query_service.database_manager") as mock_mgr, \
+             patch("app.services.query_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            final_sql, columns, rows, exec_time, truncated = await query_service.execute_validated_query(
+                "testdb", "SELECT * FROM users LIMIT 10"
+            )
+
+            # Should preserve existing LIMIT
+            assert truncated is False
+            # MySQL should pass ssl_disabled=True
+            mock_connector.execute_query.assert_called_once()
+            call_args = mock_connector.execute_query.call_args
+            assert call_args[0][2] is True  # ssl_disabled
+
+    async def test_execute_validated_query_database_not_found(self):
+        """Test execute_validated_query with non-existent database."""
+        from unittest.mock import AsyncMock, patch
+
+        with patch("app.services.query_service.database_manager") as mock_mgr:
+            mock_mgr.get_database = AsyncMock(return_value=None)
+
+            with pytest.raises(ValueError, match="Database.*not found"):
+                await query_service.execute_validated_query("nonexistent", "SELECT 1")
+

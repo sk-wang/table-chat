@@ -21,8 +21,8 @@
 
 **Purpose**: 创建缓存服务基础设施
 
-- [ ] T001 [P] 创建缓存类型定义文件 `frontend/src/types/storage.ts`
-- [ ] T002 [P] 创建缓存服务文件 `frontend/src/services/storage.ts`
+- [x] T001 [P] 创建缓存类型定义文件 `frontend/src/types/storage.ts`
+- [x] T002 [P] 创建缓存服务文件 `frontend/src/services/storage.ts`
 
 ---
 
@@ -32,9 +32,9 @@
 
 **⚠️ CRITICAL**: 所有用户故事依赖此阶段完成
 
-- [ ] T003 实现安全的 localStorage 读写封装（try-catch）in `frontend/src/services/storage.ts`
-- [ ] T004 实现缓存版本管理（getVersion/setVersion/checkVersion）in `frontend/src/services/storage.ts`
-- [ ] T005 实现版本不兼容时的缓存清理逻辑 in `frontend/src/services/storage.ts`
+- [x] T003 实现安全的 localStorage 读写封装（try-catch）in `frontend/src/services/storage.ts`
+- [x] T004 实现缓存版本管理（getVersion/setVersion/checkVersion）in `frontend/src/services/storage.ts`
+- [x] T005 实现版本不兼容时的缓存清理逻辑 in `frontend/src/services/storage.ts`
 
 **Checkpoint**: 缓存服务基础能力就绪，可以开始用户故事实现
 
@@ -48,10 +48,10 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [US1] 实现 getSelectedDatabase/setSelectedDatabase/clearSelectedDatabase 方法 in `frontend/src/services/storage.ts`
-- [ ] T007 [US1] 修改 DatabaseContext 在选择数据库时保存到缓存 in `frontend/src/contexts/DatabaseContext.tsx`
-- [ ] T008 [US1] 修改 DatabaseContext 在初始化时从缓存恢复选中的数据库 in `frontend/src/contexts/DatabaseContext.tsx`
-- [ ] T009 [US1] 处理边界情况：已删除的数据库不应被自动选中 in `frontend/src/contexts/DatabaseContext.tsx`
+- [x] T006 [US1] 实现 getSelectedDatabase/setSelectedDatabase/clearSelectedDatabase 方法 in `frontend/src/services/storage.ts`
+- [x] T007 [US1] 修改 DatabaseContext 在选择数据库时保存到缓存 in `frontend/src/contexts/DatabaseContext.tsx`
+- [x] T008 [US1] 修改 DatabaseContext 在初始化时从缓存恢复选中的数据库 in `frontend/src/contexts/DatabaseContext.tsx`
+- [x] T009 [US1] 处理边界情况：已删除的数据库不应被自动选中 in `frontend/src/contexts/DatabaseContext.tsx`
 
 **Checkpoint**: 用户故事 1 功能完整，可独立测试
 
@@ -65,10 +65,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T010 [US2] 实现 getTableListCache/setTableListCache/clearTableListCache 方法 in `frontend/src/services/storage.ts`
-- [ ] T011 [US2] 修改 QueryPage 在加载表列表时优先检查缓存 in `frontend/src/pages/query/index.tsx`
-- [ ] T012 [US2] 修改 QueryPage 在成功获取表列表后更新缓存 in `frontend/src/pages/query/index.tsx`
-- [ ] T013 [US2] 修改强制刷新逻辑：忽略缓存并更新 in `frontend/src/pages/query/index.tsx`
+- [x] T010 [US2] 实现 getTableListCache/setTableListCache/clearTableListCache 方法 in `frontend/src/services/storage.ts`
+- [x] T011 [US2] 修改 QueryPage 在加载表列表时优先检查缓存 in `frontend/src/pages/query/index.tsx`
+- [x] T012 [US2] 修改 QueryPage 在成功获取表列表后更新缓存 in `frontend/src/pages/query/index.tsx`
+- [x] T013 [US2] 修改强制刷新逻辑：忽略缓存并更新 in `frontend/src/pages/query/index.tsx`
 
 **Checkpoint**: 用户故事 2 功能完整，可独立测试
 
@@ -82,10 +82,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T014 [US3] 实现 getTableDetailsCache/setTableDetailsCache/clearTableDetailsCache 方法 in `frontend/src/services/storage.ts`
-- [ ] T015 [US3] 修改 QueryPage 的 loadTableDetails 函数优先检查缓存 in `frontend/src/pages/query/index.tsx`
-- [ ] T016 [US3] 修改 loadTableDetails 在成功获取后更新缓存 in `frontend/src/pages/query/index.tsx`
-- [ ] T017 [US3] 强制刷新时清除所有表字段缓存 in `frontend/src/pages/query/index.tsx`
+- [x] T014 [US3] 实现 getTableDetailsCache/setTableDetailsCache/clearTableDetailsCache 方法 in `frontend/src/services/storage.ts`
+- [x] T015 [US3] 修改 QueryPage 的 loadTableDetails 函数优先检查缓存 in `frontend/src/pages/query/index.tsx`
+- [x] T016 [US3] 修改 loadTableDetails 在成功获取后更新缓存 in `frontend/src/pages/query/index.tsx`
+- [x] T017 [US3] 强制刷新时清除所有表字段缓存 in `frontend/src/pages/query/index.tsx`
 
 **Checkpoint**: 用户故事 3 功能完整，可独立测试
 
@@ -95,11 +95,11 @@
 
 **Purpose**: 完善和优化
 
-- [ ] T018 实现 clearAllCache 方法用于调试 in `frontend/src/services/storage.ts`
-- [ ] T019 实现 clearDatabaseCache(dbName) 方法清除特定数据库的缓存 in `frontend/src/services/storage.ts`
-- [ ] T020 添加控制台日志（开发模式）记录缓存命中/未命中 in `frontend/src/services/storage.ts`
-- [ ] T021 验证 localStorage 不可用时的优雅降级 in `frontend/src/services/storage.ts`
-- [ ] T022 构建并测试完整功能 via `npm run build`
+- [x] T018 实现 clearAllCache 方法用于调试 in `frontend/src/services/storage.ts`
+- [x] T019 实现 clearDatabaseCache(dbName) 方法清除特定数据库的缓存 in `frontend/src/services/storage.ts`
+- [x] T020 添加控制台日志（开发模式）记录缓存命中/未命中 in `frontend/src/services/storage.ts`
+- [x] T021 验证 localStorage 不可用时的优雅降级 in `frontend/src/services/storage.ts`
+- [x] T022 构建并测试完整功能 via `npm run build`
 
 ---
 

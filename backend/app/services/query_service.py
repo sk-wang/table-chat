@@ -1,13 +1,12 @@
 """SQL query execution service."""
 
-import time
 from typing import Any
 
 import sqlglot
 from sqlglot import exp
 
-from app.services.db_manager import database_manager
 from app.connectors.factory import ConnectorFactory
+from app.services.db_manager import database_manager
 
 
 class QueryService:
@@ -92,14 +91,14 @@ class QueryService:
         db = await database_manager.get_database(db_name)
         if not db:
             raise ValueError(f"Database '{db_name}' not found")
-        
+
         url = db["url"]
         db_type = db.get("db_type", "postgresql")
         ssl_disabled = bool(db.get("ssl_disabled", 0))
 
         # Get connector and execute query
         connector = ConnectorFactory.get_connector(url)
-        
+
         # Pass ssl_disabled for MySQL
         if db_type == "mysql":
             return await connector.execute_query(url, sql, ssl_disabled)
@@ -126,11 +125,11 @@ class QueryService:
         db = await database_manager.get_database(db_name)
         if not db:
             raise ValueError(f"Database '{db_name}' not found")
-        
+
         url = db["url"]
         db_type = db.get("db_type", "postgresql")
         ssl_disabled = bool(db.get("ssl_disabled", 0))
-        
+
         connector = ConnectorFactory.get_connector(url)
         dialect = connector.get_dialect()
 

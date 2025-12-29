@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../services/api';
+import { initCacheVersion, getSelectedDatabase, setSelectedDatabase as setSelectedDatabaseCache, clearSelectedDatabase } from '../services/storage';
 import type { DatabaseResponse } from '../types';
 
 interface DatabaseContextValue {
@@ -15,9 +16,26 @@ const DatabaseContext = createContext<DatabaseContextValue | null>(null);
 
 export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [databases, setDatabases] = useState<DatabaseResponse[]>([]);
-  const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
+  const [selectedDatabase, setSelectedDatabaseState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Custom setter that saves to both state and cache
+  const handleSetSelectedDatabase = useCallback((name: string | null) => {
+    setSelectedDatabaseState(name);
+    saveSelectedDatabaseToCache(name);
+  }, []);
+
+  // Initialize cache version and restore selected database from cache
+  useEffect(() => {
+    initCacheVersion();
+
+    // Restore selected database from cache
+    const cached = getSelectedDatabase();
+    if (cached) {
+      setSelectedDatabaseState(cached);
+    }
+  }, []);
 
   const refreshDatabases = useCallback(async () => {
     try {
@@ -26,8 +44,21 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const response = await apiClient.listDatabases();
       setDatabases(response.databases);
 
-      // Auto-select first database if none selected
-      setSelectedDatabase(prev => {
+      // Auto-select first database if none selected AND no cached selection
+      setSelectedDatabaseState(prev => {
+        // If user has a cached selection, check if it still exists
+        const cached = getSelectedDatabase();
+        if (cached) {
+          const cachedExists = response.databases.find(db => db.name === cached);
+          if (cachedExists) {
+            return cached; // Restore cached selection
+          } else {
+            // Cached database no longer exists, clear cache
+            clearSelectedDatabaseFromCache();
+          }
+        }
+
+        // Fall back to auto-select first database
         if (response.databases.length > 0 && !prev) {
           return response.databases[0].name;
         }
@@ -42,7 +73,21 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } finally {
       setLoading(false);
     }
-  }, []); // No dependencies needed - uses setters and state updater functions
+  }, []);
+
+  // Wrapper function for cache operations
+  const saveSelectedDatabaseToCache = (name: string | null) => {
+    if (name === null) {
+      clearSelectedDatabase();
+    } else {
+      setSelectedDatabaseCache(name);
+    }
+  };
+
+  // Wrapper function to clear cache
+  const clearSelectedDatabaseFromCache = () => {
+    clearSelectedDatabase();
+  }; // No dependencies needed - uses setters and state updater functions
 
   useEffect(() => {
     refreshDatabases();
@@ -53,7 +98,7 @@ export const DatabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     selectedDatabase,
     loading,
     error,
-    setSelectedDatabase,
+    setSelectedDatabase: handleSetSelectedDatabase,
     refreshDatabases,
   };
 

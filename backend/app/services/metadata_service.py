@@ -1,18 +1,17 @@
 """Database metadata extraction and caching service."""
 
 from datetime import datetime
-from typing import Any
 
+from app.connectors.factory import ConnectorFactory
 from app.db.sqlite import db_manager
 from app.models.metadata import (
     ColumnInfo,
-    TableMetadata,
-    TableSummary,
     DatabaseMetadata,
     TableListResponse,
+    TableMetadata,
+    TableSummary,
 )
 from app.services.db_manager import database_manager
-from app.connectors.factory import ConnectorFactory
 
 
 class MetadataService:
@@ -35,14 +34,14 @@ class MetadataService:
         db = await database_manager.get_database(db_name)
         if not db:
             raise ValueError(f"Database '{db_name}' not found")
-        
+
         url = db["url"]
         db_type = db.get("db_type", "postgresql")
         ssl_disabled = bool(db.get("ssl_disabled", 0))
 
         # Get connector and fetch metadata
         connector = ConnectorFactory.get_connector(url)
-        
+
         # Pass ssl_disabled for MySQL
         if db_type == "mysql":
             schemas, tables = await connector.fetch_metadata(url, ssl_disabled)
@@ -188,7 +187,7 @@ class MetadataService:
         """
         # Get full metadata (we'll strip columns)
         metadata = await self.get_or_refresh_metadata(db_name, force_refresh=force_refresh)
-        
+
         # Convert to table summaries (without columns)
         table_summaries = [
             TableSummary(
@@ -199,7 +198,7 @@ class MetadataService:
             )
             for table in metadata.tables
         ]
-        
+
         return TableListResponse(
             name=metadata.name,
             schemas=metadata.schemas,
@@ -223,19 +222,19 @@ class MetadataService:
         """
         # Get cached metadata
         metadata = await self.get_cached_metadata(db_name)
-        
+
         if not metadata:
             # Try to refresh if not cached
             try:
                 metadata = await self.refresh_metadata(db_name)
             except Exception:
                 return None
-        
+
         # Find the specific table
         for table in metadata.tables:
             if table.schema_name == schema_name and table.table_name == table_name:
                 return table
-        
+
         return None
 
 

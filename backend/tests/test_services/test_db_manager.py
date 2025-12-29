@@ -119,3 +119,67 @@ class TestDatabaseManager:
             mock_db.create_or_update_database.assert_called_once_with(
                 "testdb", "postgresql://localhost/testdb", "postgresql", False
             )
+
+    @pytest.mark.asyncio
+    async def test_create_or_update_database_mysql_with_ssl_disabled(self, manager):
+        """Test create_or_update for MySQL with ssl_disabled."""
+        with patch("app.services.db_manager.db_manager") as mock_db, \
+             patch("app.services.db_manager.ConnectorFactory") as mock_factory, \
+             patch("app.services.db_manager.settings") as mock_settings:
+
+            # Setup mocks
+            mock_connector = AsyncMock()
+            mock_factory.get_connector.return_value = mock_connector
+            mock_factory.detect_db_type.return_value = "mysql"
+            mock_settings.mysql_connect_timeout = 10
+
+            mock_db.create_or_update_database = AsyncMock(return_value={
+                "name": "mysqldb",
+                "url": "mysql://localhost/mysqldb",
+                "db_type": "mysql",
+                "ssl_disabled": True,
+            })
+
+            await manager.create_or_update_database("mysqldb", "mysql://localhost/mysqldb", ssl_disabled=True)
+
+            # MySQL should pass ssl_disabled to test_connection
+            mock_connector.test_connection.assert_called_once_with(
+                "mysql://localhost/mysqldb", 10, True
+            )
+            mock_db.create_or_update_database.assert_called_once_with(
+                "mysqldb", "mysql://localhost/mysqldb", "mysql", True
+            )
+
+    @pytest.mark.asyncio
+    async def test_test_connection_postgresql(self, manager):
+        """Test test_connection for PostgreSQL."""
+        with patch("app.services.db_manager.ConnectorFactory") as mock_factory, \
+             patch("app.services.db_manager.settings") as mock_settings:
+
+            mock_connector = AsyncMock()
+            mock_factory.get_connector.return_value = mock_connector
+            mock_factory.detect_db_type.return_value = "postgresql"
+            mock_settings.pg_connect_timeout = 10
+
+            await manager.test_connection("postgresql://localhost/testdb")
+
+            mock_connector.test_connection.assert_called_once_with(
+                "postgresql://localhost/testdb", 10
+            )
+
+    @pytest.mark.asyncio
+    async def test_test_connection_mysql(self, manager):
+        """Test test_connection for MySQL."""
+        with patch("app.services.db_manager.ConnectorFactory") as mock_factory, \
+             patch("app.services.db_manager.settings") as mock_settings:
+
+            mock_connector = AsyncMock()
+            mock_factory.get_connector.return_value = mock_connector
+            mock_factory.detect_db_type.return_value = "mysql"
+            mock_settings.mysql_connect_timeout = 15
+
+            await manager.test_connection("mysql://localhost/testdb")
+
+            mock_connector.test_connection.assert_called_once_with(
+                "mysql://localhost/testdb", 15
+            )

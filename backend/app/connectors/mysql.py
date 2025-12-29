@@ -27,7 +27,7 @@ class MySQLConnector(DatabaseConnector):
 
     def _parse_url(self, url: str) -> dict[str, Any]:
         """Parse MySQL connection URL."""
-        from urllib.parse import urlparse, unquote
+        from urllib.parse import unquote, urlparse
 
         parsed = urlparse(url)
 
@@ -51,7 +51,7 @@ class MySQLConnector(DatabaseConnector):
         def _connect() -> MySQLConnection:
             try:
                 params = self._parse_url(url)
-                
+
                 # Prepare connection parameters
                 conn_params = {
                     "host": params["host"],
@@ -61,14 +61,14 @@ class MySQLConnector(DatabaseConnector):
                     "database": params["database"],
                     "connection_timeout": timeout,
                 }
-                
+
                 # Disable SSL if requested
                 if ssl_disabled:
                     conn_params["ssl_disabled"] = True
                     # Also disable SSL verification as a fallback for older MySQL connector versions
                     conn_params["ssl_verify_cert"] = False
                     conn_params["ssl_verify_identity"] = False
-                
+
                 conn = mysql.connector.connect(**conn_params)
                 conn.close()
                 return conn
@@ -89,7 +89,7 @@ class MySQLConnector(DatabaseConnector):
 
             try:
                 params = self._parse_url(url)
-                
+
                 # Prepare connection parameters
                 conn_params = {
                     "host": params["host"],
@@ -99,14 +99,14 @@ class MySQLConnector(DatabaseConnector):
                     "database": params["database"],
                     "connection_timeout": settings.mysql_connect_timeout,
                 }
-                
+
                 # Disable SSL if requested
                 if ssl_disabled:
                     conn_params["ssl_disabled"] = True
                     # Also disable SSL verification as a fallback for older MySQL connector versions
                     conn_params["ssl_verify_cert"] = False
                     conn_params["ssl_verify_identity"] = False
-                
+
                 conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor()
 
@@ -236,7 +236,7 @@ class MySQLConnector(DatabaseConnector):
 
             try:
                 params = self._parse_url(url)
-                
+
                 # Prepare connection parameters
                 conn_params = {
                     "host": params["host"],
@@ -246,14 +246,14 @@ class MySQLConnector(DatabaseConnector):
                     "database": params["database"],
                     "connection_timeout": settings.mysql_connect_timeout,
                 }
-                
+
                 # Disable SSL if requested
                 if ssl_disabled:
                     conn_params["ssl_disabled"] = True
                     # Also disable SSL verification as a fallback for older MySQL connector versions
                     conn_params["ssl_verify_cert"] = False
                     conn_params["ssl_verify_identity"] = False
-                
+
                 conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor(dictionary=True)
 

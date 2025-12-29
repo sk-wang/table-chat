@@ -1,14 +1,12 @@
 """PostgreSQL database connector."""
 
 import asyncio
-import json
 import time
 from typing import Any
 
 import psycopg2
 from psycopg2.extensions import connection as PgConnection
 
-from app.config import settings
 from app.connectors.base import DatabaseConnector
 from app.models.metadata import ColumnInfo, TableMetadata
 

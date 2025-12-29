@@ -3,9 +3,9 @@
 import json
 
 from app.models.base import CamelModel
-from app.models.database import DatabaseCreateRequest, DatabaseResponse
+from app.models.database import DatabaseCreateRequest, DatabaseResponse, mask_password_in_url
 from app.models.query import QueryRequest, QueryResponse, QueryResult
-from app.models.error import ErrorResponse
+from app.models.error import ErrorResponse, SQLErrorResponse
 
 
 class TestCamelModel:
@@ -126,4 +126,71 @@ class TestErrorModels:
         json_data = json.loads(error.model_dump_json())
         assert json_data["error"] == "Bad request"
         assert json_data["detail"] is None
+
+    def test_sql_error_response(self):
+        """Test SQLErrorResponse model with line and column info."""
+        error = SQLErrorResponse(
+            error="SQL syntax error",
+            detail="Unexpected token",
+            line=5,
+            column=10,
+        )
+        
+        json_data = json.loads(error.model_dump_json())
+        assert json_data["error"] == "SQL syntax error"
+        assert json_data["line"] == 5
+        assert json_data["column"] == 10
+
+
+class TestMaskPassword:
+    """Test password masking utility."""
+
+    def test_mask_password_basic(self):
+        """Test masking password in basic URL."""
+        url = "postgresql://user:secret@localhost:5432/mydb"
+        masked = mask_password_in_url(url)
+        
+        assert "****" in masked
+        assert "secret" not in masked
+        assert "user" in masked
+        assert "localhost:5432/mydb" in masked
+
+    def test_mask_password_no_password(self):
+        """Test URL without password."""
+        url = "postgresql://user@localhost:5432/mydb"
+        masked = mask_password_in_url(url)
+        
+        # Should return as-is or handle gracefully
+        assert "localhost" in masked
+
+    def test_mask_password_no_at_symbol(self):
+        """Test URL without @ symbol."""
+        url = "postgresql://localhost/mydb"
+        masked = mask_password_in_url(url)
+        
+        assert masked == url
+
+    def test_mask_password_no_protocol(self):
+        """Test URL without protocol (should handle gracefully)."""
+        url = "localhost/mydb"
+        masked = mask_password_in_url(url)
+        
+        assert masked == url
+
+    def test_mask_password_mysql(self):
+        """Test masking password in MySQL URL."""
+        url = "mysql://admin:p@ssword123@db.example.com:3306/app"
+        masked = mask_password_in_url(url)
+        
+        assert "****" in masked
+        assert "p@ssword123" not in masked
+        assert "admin" in masked
+
+    def test_mask_password_complex_password(self):
+        """Test masking password with special characters."""
+        url = "postgresql://user:p%40ss%23word@localhost/db"
+        masked = mask_password_in_url(url)
+        
+        assert "****" in masked
+        assert "p%40ss%23word" not in masked
 

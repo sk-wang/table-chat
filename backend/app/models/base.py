@@ -1,7 +1,7 @@
 """Base Pydantic models with camelCase configuration."""
 
-from pydantic import BaseModel, ConfigDict
 from humps import camelize
+from pydantic import BaseModel, ConfigDict
 
 
 def to_camel(string: str) -> str:

@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import Any
 
 from openai import OpenAI
 
@@ -135,16 +134,16 @@ Example output:
 
             lines = []
             all_table_names: list[str] = []
-            
+
             for table_info in metadata:
                 schema_name = table_info.get("schema_name", "public")
                 table_name = table_info.get("table_name", "unknown")
                 table_type = table_info.get("table_type", "table")
                 table_comment = table_info.get("table_comment", "")
-                
+
                 full_table_name = f"{schema_name}.{table_name}"
                 all_table_names.append(full_table_name)
-                
+
                 comment_str = f" - {table_comment}" if table_comment else ""
                 lines.append(f"Table: {full_table_name} ({table_type}){comment_str}")
 
@@ -175,12 +174,12 @@ Example output:
         """
         # Get table summary
         table_summary, table_count, all_table_names = await self.build_table_summary_context(db_name)
-        
+
         # Skip phase 1 if table count is small
         if table_count <= TABLE_SELECTION_THRESHOLD:
             logger.debug(f"Skipping table selection: only {table_count} tables (threshold: {TABLE_SELECTION_THRESHOLD})")
             return all_table_names, False
-        
+
         if table_count == 0:
             return [], True
 
@@ -221,10 +220,10 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
                 if not isinstance(selected, list):
                     logger.warning(f"LLM returned non-list: {type(selected)}, using fallback")
                     return all_table_names, True
-                    
+
                 # Filter to only valid table names
                 valid_tables = [t for t in selected if t in all_table_names]
-                
+
                 # Also try matching without schema prefix
                 if len(valid_tables) < len(selected):
                     table_name_map = {t.split(".")[-1]: t for t in all_table_names}
@@ -234,15 +233,15 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
                             simple_name = t.split(".")[-1] if "." in t else t
                             if simple_name in table_name_map and table_name_map[simple_name] not in valid_tables:
                                 valid_tables.append(table_name_map[simple_name])
-                
+
                 if not valid_tables:
                     logger.warning("No valid tables selected by LLM, using fallback")
                     return all_table_names, True
-                
+
                 # Limit to max selected tables
                 if len(valid_tables) > MAX_SELECTED_TABLES:
                     valid_tables = valid_tables[:MAX_SELECTED_TABLES]
-                
+
                 logger.info(f"Selected {len(valid_tables)} tables from {table_count}: {valid_tables}")
                 return valid_tables, False
 
@@ -302,7 +301,7 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
                 schema_name = table_info.get("schema_name", "public")
                 table_name = table_info.get("table_name", "unknown")
                 full_table_name = f"{schema_name}.{table_name}"
-                
+
                 # Filter tables if specified
                 if filter_tables is not None:
                     if full_table_name not in filter_tables and table_name not in filter_tables:
@@ -361,10 +360,10 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
         selected_tables, fallback_used = await self.select_relevant_tables(
             db_name, prompt, db_type
         )
-        
+
         if fallback_used:
             logger.debug("Using fallback: all tables for SQL generation")
-        
+
         # Get dialect prompts
         dialect_config = self.DIALECT_PROMPTS.get(db_type, self.DIALECT_PROMPTS["postgresql"])
         system_prompt = dialect_config["system"]
@@ -372,7 +371,7 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
 
         # Phase 2: Build schema context with selected tables only
         schema_context = await self.build_schema_context(
-            db_name, 
+            db_name,
             table_names=selected_tables if selected_tables else None
         )
 

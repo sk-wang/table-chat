@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
-from app.models.metadata import ColumnInfo, TableMetadata
+from app.models.metadata import TableMetadata
 
 
 class DatabaseConnector(ABC):

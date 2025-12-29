@@ -1,6 +1,6 @@
-# TableChat - 数据库查询工具
+# TableChat - 智能数据库查询工具
 
-一个现代化的 PostgreSQL 数据库查询工具，支持 SQL 编辑器和自然语言查询。
+一个现代化的数据库查询工具，支持 **PostgreSQL** 和 **MySQL** 数据库，提供 SQL 编辑器和自然语言查询功能。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
@@ -8,13 +8,43 @@
 
 ## ✨ 功能特性
 
-- 🗄️ **数据库连接管理** - 添加、编辑、删除 PostgreSQL 连接
-- 📝 **SQL 编辑器** - Monaco Editor 提供语法高亮、自动补全
-- 🤖 **自然语言查询** - 用自然语言描述需求，AI 生成 SQL
-- 📊 **结果展示** - 表格形式展示查询结果，支持分页和排序
-- 🔍 **Schema 浏览器** - 查看数据库表结构、字段信息
-- ⌨️ **快捷键支持** - Ctrl+Enter 执行查询
-- 🔐 **密码安全** - 连接 URL 密码自动脱敏显示
+### 🗄️ 多数据库支持
+- **PostgreSQL** 和 **MySQL** 数据库连接管理
+- 添加、编辑、删除数据库连接
+- 支持禁用 SSL 连接（MySQL）
+- 连接 URL 密码自动脱敏显示
+
+### 📝 SQL 编辑器
+- Monaco Editor 提供语法高亮、自动补全
+- 快捷键支持（Ctrl+Enter 执行查询）
+- 仅允许 SELECT 语句（安全限制）
+- 未指定 LIMIT 时自动添加 LIMIT 1000
+
+### 🤖 智能自然语言查询
+- 用自然语言描述需求，AI 自动生成 SQL
+- **两阶段提示链优化**：支持大型数据库（3000+ 表）
+  - 第一阶段：智能选择相关表
+  - 第二阶段：基于选定表生成精准 SQL
+- 支持 PostgreSQL 和 MySQL 方言
+- 生成结果包含中文解释
+
+### 📊 结果展示
+- 表格形式展示查询结果
+- 支持分页和排序
+- 显示执行时间和行数
+- 结果截断提示
+
+### 🔍 Schema 浏览器
+- 查看数据库表结构、字段信息
+- **表搜索功能**：快速过滤数百张表
+- 展示表/字段注释（类似阿里云 DMS）
+- 双击表名自动生成 SELECT 语句
+- 查看字段类型、主键、可空等信息
+
+### ⚡ 性能优化
+- **浏览器本地缓存**：减少重复请求，提升响应速度
+- 元数据智能缓存
+- 查询结果快速渲染
 
 ## 🛠️ 技术栈
 
@@ -23,6 +53,7 @@
 - **FastAPI** - 高性能异步 API 框架
 - **SQLite** - 元数据存储
 - **psycopg2** - PostgreSQL 连接
+- **mysql-connector-python** - MySQL 连接
 - **sqlglot** - SQL 解析与验证
 - **OpenAI SDK** - LLM 自然语言处理
 
@@ -32,6 +63,7 @@
 - **Ant Design** - UI 组件库
 - **Monaco Editor** - 代码编辑器
 - **Tailwind CSS** - 样式框架
+- **localStorage** - 浏览器本地缓存
 
 ## 🚀 快速开始
 
@@ -39,7 +71,7 @@
 
 - Python 3.13+ (推荐使用 [uv](https://github.com/astral-sh/uv))
 - Node.js 18+
-- PostgreSQL 数据库（作为查询目标）
+- PostgreSQL 或 MySQL 数据库（作为查询目标）
 
 ### 1. 克隆项目
 
@@ -86,20 +118,27 @@ npm run dev
 
 ### 添加数据库连接
 
-1. 打开应用，进入 **Databases** 页面
+1. 打开应用，左侧边栏显示所有已添加的数据库
 2. 点击 **Add Database** 按钮
-3. 输入连接名称和 PostgreSQL 连接字符串：
-   ```
-   postgresql://user:password@localhost:5432/mydb
-   ```
+3. 输入连接名称和连接字符串：
+
+**PostgreSQL：**
+```
+postgresql://user:password@localhost:5432/mydb
+```
+
+**MySQL：**
+```
+mysql://user:password@localhost:3306/mydb
+```
+
 4. 点击 **Save** 保存
 
 ### 执行 SQL 查询
 
-1. 进入 **Query** 页面
-2. 在头部选择目标数据库
-3. 在 SQL 编辑器中输入查询语句
-4. 点击 **Execute** 或按 `Ctrl+Enter` 执行
+1. 在左侧边栏选择目标数据库
+2. 在 SQL 编辑器中输入查询语句
+3. 点击 **Execute** 或按 `Ctrl+Enter` 执行
 
 **注意事项：**
 - 仅支持 SELECT 语句（安全限制）
@@ -112,12 +151,16 @@ npm run dev
 3. 点击 **生成 SQL**
 4. 检查生成的 SQL 后执行
 
+**提示：** 系统会自动识别相关表，即使数据库有数千张表也能快速生成准确的 SQL。
+
 ### 浏览数据库结构
 
-在 Query 页面左侧的 Schema 浏览器中：
+在左侧 Schema 浏览器中：
+- 使用**搜索框**快速过滤表名
 - 展开查看表和视图列表
 - 双击表名自动生成 SELECT 语句
 - 查看字段类型、主键、可空等信息
+- 查看表和字段的注释
 
 ## 📁 项目结构
 
@@ -126,18 +169,25 @@ tableChat/
 ├── backend/                 # Python 后端
 │   ├── app/
 │   │   ├── api/v1/         # API 路由
+│   │   ├── connectors/     # 数据库连接器（PostgreSQL/MySQL）
 │   │   ├── models/         # Pydantic 模型
-│   │   ├── services/       # 业务逻辑
-│   │   └── db/             # 数据库操作
+│   │   ├── services/       # 业务逻辑（含 LLM 服务）
+│   │   └── db/             # SQLite 元数据存储
 │   ├── tests/              # 测试用例
 │   └── pyproject.toml
 ├── frontend/               # React 前端
 │   ├── src/
 │   │   ├── components/     # React 组件
+│   │   │   ├── database/   # 数据库管理组件
+│   │   │   ├── editor/     # SQL 编辑器组件
+│   │   │   ├── results/    # 查询结果组件
+│   │   │   ├── sidebar/    # 侧边栏（含表搜索）
+│   │   │   └── layout/     # 布局组件
 │   │   ├── pages/          # 页面
 │   │   ├── contexts/       # React Context
 │   │   ├── services/       # API 客户端
 │   │   └── types/          # TypeScript 类型
+│   ├── e2e/                # E2E 测试
 │   └── package.json
 ├── specs/                  # 设计规格文档
 ├── api-tests.rest          # API 测试用例
@@ -166,8 +216,14 @@ uv run pytest -m "not integration"
 ```bash
 cd frontend
 
+# 单元测试
+npm run test
+
 # E2E 测试（需要先启动服务）
 npm run test:e2e
+
+# E2E 可视化模式
+npm run test:e2e:ui
 ```
 
 ## 🔧 API 参考
@@ -195,12 +251,31 @@ npm run test:e2e
 
 | 变量名 | 描述 | 默认值 |
 |--------|------|--------|
-| `OPENAI_API_KEY` | OpenAI API 密钥 | - |
-| `OPENAI_BASE_URL` | OpenAI API 地址 | `https://api.openai.com/v1` |
+| `OPENAI_API_KEY` 或 `LLM_API_KEY` | LLM API 密钥 | - |
+| `OPENAI_BASE_URL` 或 `LLM_API_BASE` | LLM API 地址 | `https://api.openai.com/v1` |
 | `LLM_MODEL` | 使用的模型名称 | `gpt-3.5-turbo` |
 | `DATABASE_PATH` | SQLite 存储路径 | `./scinew.db` |
 | `PORT` | 后端端口 | `7888` |
 
+## 🗺️ 功能路线图
+
+- [x] 基础 SQL 查询功能
+- [x] PostgreSQL 支持
+- [x] MySQL 支持
+- [x] Schema 注释显示
+- [x] 表搜索功能
+- [x] 两阶段提示链（支持大型数据库）
+- [x] 浏览器本地缓存
+- [ ] 导出功能（CSV/JSON）
+- [ ] SQL 执行历史记录
+- [ ] SSH 隧道支持
+
 ## 📄 License
 
 MIT License - 详见 [LICENSE](LICENSE)
+
+## 📚 相关文档
+
+- [快速开始指南](QUICKSTART.md)
+- [测试指南](TESTING.md)
+- [API 测试集合](api-tests.rest)

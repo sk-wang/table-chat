@@ -190,6 +190,67 @@ class TestMetadataService:
                 await service.fetch_metadata("testdb")
 
     @pytest.mark.asyncio
+    async def test_fetch_metadata_postgresql_success(self, service):
+        """Test fetch_metadata for PostgreSQL."""
+        from app.models.metadata import ColumnInfo, TableMetadata
+
+        mock_db = {
+            "url": "postgresql://localhost/testdb",
+            "db_type": "postgresql",
+            "ssl_disabled": False,
+        }
+
+        mock_schemas = ["public"]
+        mock_tables = [
+            TableMetadata(
+                schema_name="public",
+                table_name="users",
+                table_type="table",
+                columns=[ColumnInfo(name="id", data_type="integer")],
+            )
+        ]
+
+        mock_connector = MagicMock()
+        mock_connector.fetch_metadata = AsyncMock(return_value=(mock_schemas, mock_tables))
+
+        with patch("app.services.metadata_service.database_manager") as mock_mgr, \
+             patch("app.services.metadata_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            result = await service.fetch_metadata("testdb")
+
+            assert result.name == "testdb"
+            assert "public" in result.schemas
+            assert len(result.tables) == 1
+            # PostgreSQL should not pass ssl_disabled
+            mock_connector.fetch_metadata.assert_called_once_with("postgresql://localhost/testdb")
+
+    @pytest.mark.asyncio
+    async def test_fetch_metadata_mysql_with_ssl_disabled(self, service):
+        """Test fetch_metadata for MySQL with ssl_disabled."""
+        from app.models.metadata import TableMetadata
+
+        mock_db = {
+            "url": "mysql://localhost/testdb",
+            "db_type": "mysql",
+            "ssl_disabled": 1,  # SQLite stores as integer
+        }
+
+        mock_connector = MagicMock()
+        mock_connector.fetch_metadata = AsyncMock(return_value=([], []))
+
+        with patch("app.services.metadata_service.database_manager") as mock_mgr, \
+             patch("app.services.metadata_service.ConnectorFactory") as mock_factory:
+            mock_mgr.get_database = AsyncMock(return_value=mock_db)
+            mock_factory.get_connector.return_value = mock_connector
+
+            await service.fetch_metadata("testdb")
+
+            # MySQL should pass ssl_disabled=True
+            mock_connector.fetch_metadata.assert_called_once_with("mysql://localhost/testdb", True)
+
+    @pytest.mark.asyncio
     async def test_cache_metadata_includes_table_comment(self, service):
         """Test that cache_metadata passes table comment to save_metadata."""
         columns = [

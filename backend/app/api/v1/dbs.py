@@ -220,13 +220,13 @@ async def get_table_details(
         table_details = await metadata_service.get_table_details(
             name, schema_name, table_name
         )
-        
+
         if not table_details:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Table '{schema_name}.{table_name}' not found in database '{name}'",
             )
-        
+
         return table_details
     except HTTPException:
         raise

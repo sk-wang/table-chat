@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Typography, Alert, Tabs, Layout, App } from 'antd';
 import { CodeOutlined, RobotOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
@@ -8,6 +8,13 @@ import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInp
 import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
+import {
+  getTableListCache,
+  setTableListCache,
+  getTableDetailsCache,
+  setTableDetailsCache,
+  clearTableDetailsCache,
+} from '../../services/storage';
 import type { QueryResult } from '../../types';
 import type { TableMetadata, TableSummary } from '../../types/metadata';
 
@@ -52,6 +59,7 @@ export const QueryPage: React.FC = () => {
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
 
   // Load table list when database changes (without column details)
+  //优先使用缓存，API 作为回退 (T011, T012)
   useEffect(() => {
     if (!selectedDatabase) {
       setTableSummaries(null);
@@ -59,11 +67,28 @@ export const QueryPage: React.FC = () => {
       return;
     }
 
-    const loadTableList = async () => {
+    const loadTableList = async (forceRefresh: boolean = false) => {
+      // Try cache first unless force refresh (T011)
+      if (!forceRefresh) {
+        const cached = getTableListCache(selectedDatabase);
+        if (cached) {
+          console.log('[Cache] Table list hit for', selectedDatabase);
+          setTableSummaries(cached.tables);
+          setMetadataLoading(false);
+          return;
+        }
+        console.log('[Cache] Table list miss for', selectedDatabase);
+      }
+
       try {
         setMetadataLoading(true);
-        const response = await apiClient.getTableList(selectedDatabase);
-        setTableSummaries(response.tables || []);
+        const response = await apiClient.getTableList(selectedDatabase, forceRefresh);
+        const tables = response.tables || [];
+
+        // Update cache after successful API call (T012)
+        setTableListCache(selectedDatabase, tables);
+
+        setTableSummaries(tables);
         setTableDetails(new Map()); // Clear previous details
       } catch (err) {
         console.error('Failed to load table list:', err);
@@ -76,30 +101,69 @@ export const QueryPage: React.FC = () => {
     loadTableList();
   }, [selectedDatabase]);
 
-  // Load table details on demand
-  const loadTableDetails = async (schemaName: string, tableName: string) => {
+  // Load table details on demand - 优先使用缓存 (T015, T016)
+  const loadTableDetails = useCallback(async (schemaName: string, tableName: string) => {
     if (!selectedDatabase) return;
-    
+
     const key = `${schemaName}.${tableName}`;
-    // Skip if already loaded
+    // Skip if already loaded in memory
     if (tableDetails.has(key)) return;
-    
+
+    // Try cache first (T015)
+    const cached = getTableDetailsCache(selectedDatabase, key);
+    if (cached) {
+      console.log('[Cache] Table details hit for', key);
+      const details: TableMetadata = {
+        schemaName,
+        tableName,
+        tableType: 'table',
+        columns: cached.columns.map(c => ({
+          name: c.name,
+          dataType: c.type,
+          isNullable: c.nullable,
+          isPrimaryKey: c.isPrimaryKey,
+          comment: c.comment,
+        })),
+      };
+      setTableDetails(prev => new Map(prev).set(key, details));
+      return;
+    }
+    console.log('[Cache] Table details miss for', key);
+
     try {
       const details = await apiClient.getTableDetails(selectedDatabase, schemaName, tableName);
+
+      // Update cache after successful API call (T016)
+      setTableDetailsCache(selectedDatabase, key, details.columns.map(c => ({
+        name: c.name,
+        type: c.dataType,
+        nullable: c.isNullable,
+        isPrimaryKey: c.isPrimaryKey,
+        comment: c.comment,
+      })));
+
       setTableDetails(prev => new Map(prev).set(key, details));
     } catch (err) {
       console.error(`Failed to load table details for ${key}:`, err);
     }
-  };
+  }, [selectedDatabase, tableDetails]);
 
   const handleRefreshMetadata = async () => {
     if (!selectedDatabase) return;
-    
+
     try {
       setMetadataLoading(true);
       const response = await apiClient.getTableList(selectedDatabase, true);
-      setTableSummaries(response.tables || []);
-      setTableDetails(new Map()); // Clear cached details
+      const tables = response.tables || [];
+
+      // Update cache after force refresh (T013)
+      setTableListCache(selectedDatabase, tables);
+
+      // Clear table details cache on force refresh (T017)
+      clearTableDetailsCache(selectedDatabase);
+
+      setTableSummaries(tables);
+      setTableDetails(new Map());
       message.success('Schema refreshed');
     } catch (err) {
       message.error('Failed to refresh schema');

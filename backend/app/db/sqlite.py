@@ -1,10 +1,11 @@
 """SQLite database manager for storing connection configs and metadata."""
 
 import json
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any
 
 import aiosqlite
 
@@ -57,7 +58,7 @@ class SQLiteManager:
         self.db_path = db_path or settings.database_path
 
     @asynccontextmanager
-    async def get_connection(self) -> AsyncGenerator[aiosqlite.Connection, None]:
+    async def get_connection(self) -> AsyncGenerator[aiosqlite.Connection]:
         """Get an async database connection."""
         async with aiosqlite.connect(self.db_path) as conn:
             conn.row_factory = aiosqlite.Row
