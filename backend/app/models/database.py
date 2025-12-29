@@ -11,6 +11,7 @@ class DatabaseCreateRequest(CamelModel):
     """Request model for creating/updating a database connection."""
 
     url: str = Field(..., description="Database connection URL (postgresql:// or mysql://)")
+    ssl_disabled: bool = Field(False, description="Disable SSL for MySQL connection (only applies to MySQL)")
 
 
 class DatabaseResponse(CamelModel):
@@ -19,6 +20,7 @@ class DatabaseResponse(CamelModel):
     name: str
     url: str  # Masked in actual responses
     db_type: str  # 'postgresql' or 'mysql'
+    ssl_disabled: bool  # SSL disabled flag (only applies to MySQL)
     created_at: datetime
     updated_at: datetime
 

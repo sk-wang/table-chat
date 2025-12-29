@@ -27,35 +27,49 @@ class MySQLConnector(DatabaseConnector):
 
     def _parse_url(self, url: str) -> dict[str, Any]:
         """Parse MySQL connection URL."""
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, unquote
 
         parsed = urlparse(url)
 
         if parsed.scheme != "mysql":
             raise ValueError(f"Expected mysql:// URL, got {parsed.scheme}://")
 
+        # unquote password to handle URL-encoded characters like %40 (@), %23 (#)
+        password = unquote(parsed.password) if parsed.password else ""
+
         return {
             "host": parsed.hostname or "localhost",
             "port": parsed.port or 3306,
             "user": parsed.username or "",
-            "password": parsed.password or "",
+            "password": password,
             "database": parsed.path[1:] if parsed.path else "",  # Remove leading /
         }
 
-    async def test_connection(self, url: str, timeout: int) -> None:
+    async def test_connection(self, url: str, timeout: int, ssl_disabled: bool = False) -> None:
         """Test MySQL connection."""
 
         def _connect() -> MySQLConnection:
             try:
                 params = self._parse_url(url)
-                conn = mysql.connector.connect(
-                    host=params["host"],
-                    port=params["port"],
-                    user=params["user"],
-                    password=params["password"],
-                    database=params["database"],
-                    connection_timeout=timeout,
-                )
+                
+                # Prepare connection parameters
+                conn_params = {
+                    "host": params["host"],
+                    "port": params["port"],
+                    "user": params["user"],
+                    "password": params["password"],
+                    "database": params["database"],
+                    "connection_timeout": timeout,
+                }
+                
+                # Disable SSL if requested
+                if ssl_disabled:
+                    conn_params["ssl_disabled"] = True
+                    # Also disable SSL verification as a fallback for older MySQL connector versions
+                    conn_params["ssl_verify_cert"] = False
+                    conn_params["ssl_verify_identity"] = False
+                
+                conn = mysql.connector.connect(**conn_params)
                 conn.close()
                 return conn
             except mysql.connector.Error as e:
@@ -66,7 +80,7 @@ class MySQLConnector(DatabaseConnector):
         await asyncio.to_thread(_connect)
 
     async def fetch_metadata(
-        self, url: str
+        self, url: str, ssl_disabled: bool = False
     ) -> tuple[list[str], list[TableMetadata]]:
         """Fetch MySQL metadata using INFORMATION_SCHEMA."""
 
@@ -75,14 +89,25 @@ class MySQLConnector(DatabaseConnector):
 
             try:
                 params = self._parse_url(url)
-                conn = mysql.connector.connect(
-                    host=params["host"],
-                    port=params["port"],
-                    user=params["user"],
-                    password=params["password"],
-                    database=params["database"],
-                    connection_timeout=settings.mysql_connect_timeout,
-                )
+                
+                # Prepare connection parameters
+                conn_params = {
+                    "host": params["host"],
+                    "port": params["port"],
+                    "user": params["user"],
+                    "password": params["password"],
+                    "database": params["database"],
+                    "connection_timeout": settings.mysql_connect_timeout,
+                }
+                
+                # Disable SSL if requested
+                if ssl_disabled:
+                    conn_params["ssl_disabled"] = True
+                    # Also disable SSL verification as a fallback for older MySQL connector versions
+                    conn_params["ssl_verify_cert"] = False
+                    conn_params["ssl_verify_identity"] = False
+                
+                conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor()
 
                 # Get all databases (schemas)
@@ -201,7 +226,7 @@ class MySQLConnector(DatabaseConnector):
         return await asyncio.to_thread(_fetch)
 
     async def execute_query(
-        self, url: str, sql: str
+        self, url: str, sql: str, ssl_disabled: bool = False
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """Execute MySQL query."""
 
@@ -211,14 +236,25 @@ class MySQLConnector(DatabaseConnector):
 
             try:
                 params = self._parse_url(url)
-                conn = mysql.connector.connect(
-                    host=params["host"],
-                    port=params["port"],
-                    user=params["user"],
-                    password=params["password"],
-                    database=params["database"],
-                    connection_timeout=settings.mysql_connect_timeout,
-                )
+                
+                # Prepare connection parameters
+                conn_params = {
+                    "host": params["host"],
+                    "port": params["port"],
+                    "user": params["user"],
+                    "password": params["password"],
+                    "database": params["database"],
+                    "connection_timeout": settings.mysql_connect_timeout,
+                }
+                
+                # Disable SSL if requested
+                if ssl_disabled:
+                    conn_params["ssl_disabled"] = True
+                    # Also disable SSL verification as a fallback for older MySQL connector versions
+                    conn_params["ssl_verify_cert"] = False
+                    conn_params["ssl_verify_identity"] = False
+                
+                conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor(dictionary=True)
 
                 cursor.execute(sql)

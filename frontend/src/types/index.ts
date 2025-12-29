@@ -2,6 +2,7 @@
 
 export interface DatabaseCreateRequest {
   url: string;
+  sslDisabled?: boolean;
 }
 
 export interface QueryRequest {
@@ -21,6 +22,7 @@ export interface DatabaseResponse {
   name: string;
   url: string;
   dbType: 'postgresql' | 'mysql';
+  sslDisabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

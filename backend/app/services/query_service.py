@@ -88,12 +88,23 @@ class QueryService:
             ValueError: If database not found
             Exception: If query execution fails
         """
-        # Get connection URL
-        url = await database_manager.get_connection(db_name)
+        # Get database info including ssl_disabled
+        db = await database_manager.get_database(db_name)
+        if not db:
+            raise ValueError(f"Database '{db_name}' not found")
+        
+        url = db["url"]
+        db_type = db.get("db_type", "postgresql")
+        ssl_disabled = bool(db.get("ssl_disabled", 0))
 
         # Get connector and execute query
         connector = ConnectorFactory.get_connector(url)
-        return await connector.execute_query(url, sql)
+        
+        # Pass ssl_disabled for MySQL
+        if db_type == "mysql":
+            return await connector.execute_query(url, sql, ssl_disabled)
+        else:
+            return await connector.execute_query(url, sql)
 
     async def execute_validated_query(
         self, db_name: str, sql: str
@@ -111,8 +122,15 @@ class QueryService:
         Raises:
             ValueError: If SQL is invalid or not a SELECT statement
         """
-        # Get connection URL to determine dialect
-        url = await database_manager.get_connection(db_name)
+        # Get database info including ssl_disabled
+        db = await database_manager.get_database(db_name)
+        if not db:
+            raise ValueError(f"Database '{db_name}' not found")
+        
+        url = db["url"]
+        db_type = db.get("db_type", "postgresql")
+        ssl_disabled = bool(db.get("ssl_disabled", 0))
+        
         connector = ConnectorFactory.get_connector(url)
         dialect = connector.get_dialect()
 
@@ -125,8 +143,11 @@ class QueryService:
         # Inject LIMIT if needed
         final_sql, truncated = self.inject_limit(sql, parsed, dialect)
 
-        # Execute query
-        columns, rows, execution_time_ms = await connector.execute_query(url, final_sql)
+        # Execute query with ssl_disabled for MySQL
+        if db_type == "mysql":
+            columns, rows, execution_time_ms = await connector.execute_query(url, final_sql, ssl_disabled)
+        else:
+            columns, rows, execution_time_ms = await connector.execute_query(url, final_sql)
 
         return final_sql, columns, rows, execution_time_ms, truncated
 

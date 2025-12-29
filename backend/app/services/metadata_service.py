@@ -25,12 +25,23 @@ class MetadataService:
         Raises:
             ValueError: If database not found or connection fails
         """
-        # Get connection URL
-        url = await database_manager.get_connection(db_name)
+        # Get database info including ssl_disabled
+        db = await database_manager.get_database(db_name)
+        if not db:
+            raise ValueError(f"Database '{db_name}' not found")
+        
+        url = db["url"]
+        db_type = db.get("db_type", "postgresql")
+        ssl_disabled = bool(db.get("ssl_disabled", 0))
 
         # Get connector and fetch metadata
         connector = ConnectorFactory.get_connector(url)
-        schemas, tables = await connector.fetch_metadata(url)
+        
+        # Pass ssl_disabled for MySQL
+        if db_type == "mysql":
+            schemas, tables = await connector.fetch_metadata(url, ssl_disabled)
+        else:
+            schemas, tables = await connector.fetch_metadata(url)
 
         return DatabaseMetadata(
             name=db_name,

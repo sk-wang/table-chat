@@ -45,6 +45,10 @@ MIGRATION_ADD_TABLE_COMMENT = """
 ALTER TABLE table_metadata ADD COLUMN table_comment TEXT;
 """
 
+MIGRATION_ADD_SSL_DISABLED = """
+ALTER TABLE databases ADD COLUMN ssl_disabled INTEGER DEFAULT 0;
+"""
+
 
 class SQLiteManager:
     """Async SQLite database manager."""
@@ -68,6 +72,7 @@ class SQLiteManager:
             # Run migrations for existing databases
             await self._migrate_add_db_type(conn)
             await self._migrate_add_table_comment(conn)
+            await self._migrate_add_ssl_disabled(conn)
 
     async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
         """Add db_type column if it doesn't exist (migration for existing DBs)."""
@@ -95,13 +100,26 @@ class SQLiteManager:
                 # Column already exists or other error, ignore
                 pass
 
+    async def _migrate_add_ssl_disabled(self, conn: aiosqlite.Connection) -> None:
+        """Add ssl_disabled column if it doesn't exist (migration for existing DBs)."""
+        cursor = await conn.execute("PRAGMA table_info(databases)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        if "ssl_disabled" not in column_names:
+            try:
+                await conn.execute(MIGRATION_ADD_SSL_DISABLED)
+                await conn.commit()
+            except Exception:
+                # Column already exists or other error, ignore
+                pass
+
     # === Database CRUD Operations ===
 
     async def list_databases(self) -> list[dict[str, Any]]:
         """List all saved database connections."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, db_type, created_at, updated_at FROM databases ORDER BY name"
+                "SELECT name, url, db_type, ssl_disabled, created_at, updated_at FROM databases ORDER BY name"
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -110,29 +128,30 @@ class SQLiteManager:
         """Get a database connection by name."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, db_type, created_at, updated_at FROM databases WHERE name = ?",
+                "SELECT name, url, db_type, ssl_disabled, created_at, updated_at FROM databases WHERE name = ?",
                 (name,),
             )
             row = await cursor.fetchone()
             return dict(row) if row else None
 
     async def create_or_update_database(
-        self, name: str, url: str, db_type: str = "postgresql"
+        self, name: str, url: str, db_type: str = "postgresql", ssl_disabled: bool = False
     ) -> dict[str, Any]:
         """Create or update a database connection."""
         now = datetime.now().isoformat()
+        ssl_disabled_int = 1 if ssl_disabled else 0
         async with self.get_connection() as conn:
             # Check if exists
             existing = await self.get_database(name)
             if existing:
                 await conn.execute(
-                    "UPDATE databases SET url = ?, db_type = ?, updated_at = ? WHERE name = ?",
-                    (url, db_type, now, name),
+                    "UPDATE databases SET url = ?, db_type = ?, ssl_disabled = ?, updated_at = ? WHERE name = ?",
+                    (url, db_type, ssl_disabled_int, now, name),
                 )
             else:
                 await conn.execute(
-                    "INSERT INTO databases (name, url, db_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-                    (name, url, db_type, now, now),
+                    "INSERT INTO databases (name, url, db_type, ssl_disabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (name, url, db_type, ssl_disabled_int, now, now),
                 )
             await conn.commit()
 

@@ -18,7 +18,9 @@ class DatabaseManager:
         """Get a database connection by name."""
         return await db_manager.get_database(name)
 
-    async def create_or_update_database(self, name: str, url: str) -> dict[str, Any]:
+    async def create_or_update_database(
+        self, name: str, url: str, ssl_disabled: bool = False
+    ) -> dict[str, Any]:
         """
         Create or update a database connection.
         Tests the connection before saving.
@@ -37,10 +39,14 @@ class DatabaseManager:
             else settings.pg_connect_timeout
         )
 
-        await connector.test_connection(url, timeout)
+        # Test connection with ssl_disabled (only applies to MySQL)
+        if db_type == "mysql":
+            await connector.test_connection(url, timeout, ssl_disabled)
+        else:
+            await connector.test_connection(url, timeout)
 
-        # Save to SQLite (now includes db_type)
-        return await db_manager.create_or_update_database(name, url, db_type)
+        # Save to SQLite (now includes db_type and ssl_disabled)
+        return await db_manager.create_or_update_database(name, url, db_type, ssl_disabled)
 
     async def delete_database(self, name: str) -> bool:
         """Delete a database connection."""

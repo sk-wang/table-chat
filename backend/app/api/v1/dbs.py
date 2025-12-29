@@ -33,6 +33,7 @@ async def list_databases() -> DatabaseListResponse:
             name=db["name"],
             url=mask_password_in_url(db["url"]),
             db_type=db.get("db_type", "postgresql"),
+            ssl_disabled=bool(db.get("ssl_disabled", 0)),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )
@@ -64,6 +65,7 @@ async def get_database(name: str) -> DatabaseResponse:
         name=db["name"],
         url=mask_password_in_url(db["url"]),
         db_type=db.get("db_type", "postgresql"),
+        ssl_disabled=bool(db.get("ssl_disabled", 0)),
         created_at=datetime.fromisoformat(db["created_at"]),
         updated_at=datetime.fromisoformat(db["updated_at"]),
     )
@@ -166,12 +168,15 @@ async def create_or_update_database(
     Tests the connection before saving.
     """
     try:
-        db = await database_manager.create_or_update_database(name, request.url)
+        db = await database_manager.create_or_update_database(
+            name, request.url, request.ssl_disabled
+        )
 
         return DatabaseResponse(
             name=db["name"],
             url=mask_password_in_url(db["url"]),
             db_type=db.get("db_type", "postgresql"),
+            ssl_disabled=bool(db.get("ssl_disabled", 0)),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )

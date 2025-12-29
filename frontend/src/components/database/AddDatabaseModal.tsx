@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, message, Radio, Space, Typography } from 'antd';
+import { Modal, Form, Input, message, Radio, Space, Typography, Checkbox } from 'antd';
 import type { DatabaseResponse } from '../../types';
 import { apiClient } from '../../services/api';
 
@@ -52,6 +52,7 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
       form.setFieldsValue({
         name: editingDatabase.name,
         url: '', // Don't populate URL for security
+        sslDisabled: editingDatabase.sslDisabled || false,
       });
       // Set dbType based on existing database
       setDbType(editingDatabase.dbType as DbType || 'postgresql');
@@ -76,7 +77,10 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
       const values = await form.validateFields();
       setLoading(true);
 
-      await apiClient.createOrUpdateDatabase(values.name, { url: values.url });
+      await apiClient.createOrUpdateDatabase(values.name, {
+        url: values.url,
+        sslDisabled: values.sslDisabled || false,
+      });
 
       message.success(
         editingDatabase
@@ -184,6 +188,21 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
             placeholder={dbConfig.placeholder}
           />
         </Form.Item>
+
+        {/* SSL Disabled Option - Only for MySQL */}
+        {dbType === 'mysql' && (
+          <Form.Item
+            name="sslDisabled"
+            valuePropName="checked"
+            extra={
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                仅在遇到 SSL 协议兼容性问题时使用
+              </Text>
+            }
+          >
+            <Checkbox>禁用 SSL</Checkbox>
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   );
