@@ -16,6 +16,7 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "pyhumps>=3.8.0",
     "python-dotenv>=1.0.0",
+    "jieba>=0.42.1",
 ]
 
 [project.optional-dependencies]

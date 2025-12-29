@@ -50,6 +50,32 @@ MIGRATION_ADD_SSL_DISABLED = """
 ALTER TABLE databases ADD COLUMN ssl_disabled INTEGER DEFAULT 0;
 """
 
+# Query history table schema
+QUERY_HISTORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS query_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    db_name TEXT NOT NULL,
+    sql_content TEXT NOT NULL,
+    natural_query TEXT,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    execution_time_ms INTEGER NOT NULL DEFAULT 0,
+    executed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (db_name) REFERENCES databases(name) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_history_db_time ON query_history(db_name, executed_at DESC);
+"""
+
+# FTS5 virtual table for full-text search (stores tokenized content)
+QUERY_HISTORY_FTS_SCHEMA = """
+CREATE VIRTUAL TABLE IF NOT EXISTS query_history_fts USING fts5(
+    sql_tokens,
+    natural_tokens,
+    content='query_history',
+    content_rowid='id'
+);
+"""
+
 
 class SQLiteManager:
     """Async SQLite database manager."""
@@ -74,6 +100,7 @@ class SQLiteManager:
             await self._migrate_add_db_type(conn)
             await self._migrate_add_table_comment(conn)
             await self._migrate_add_ssl_disabled(conn)
+            await self._migrate_add_query_history(conn)
 
     async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
         """Add db_type column if it doesn't exist (migration for existing DBs)."""
@@ -112,6 +139,32 @@ class SQLiteManager:
                 await conn.commit()
             except Exception:
                 # Column already exists or other error, ignore
+                pass
+
+    async def _migrate_add_query_history(self, conn: aiosqlite.Connection) -> None:
+        """Create query_history table and FTS5 index if they don't exist."""
+        # Check if query_history table exists
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='query_history'"
+        )
+        if not await cursor.fetchone():
+            try:
+                await conn.executescript(QUERY_HISTORY_SCHEMA)
+                await conn.commit()
+            except Exception:
+                # Table already exists or other error, ignore
+                pass
+
+        # Check if FTS5 virtual table exists
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='query_history_fts'"
+        )
+        if not await cursor.fetchone():
+            try:
+                await conn.executescript(QUERY_HISTORY_FTS_SCHEMA)
+                await conn.commit()
+            except Exception:
+                # Table already exists or other error, ignore
                 pass
 
     # === Database CRUD Operations ===
@@ -219,6 +272,120 @@ class SQLiteManager:
         async with self.get_connection() as conn:
             await conn.execute("DELETE FROM table_metadata WHERE db_name = ?", (db_name,))
             await conn.commit()
+
+    # === Query History Operations ===
+
+    async def create_query_history(
+        self,
+        db_name: str,
+        sql_content: str,
+        sql_tokens: str,
+        natural_query: str | None,
+        natural_tokens: str,
+        row_count: int,
+        execution_time_ms: int,
+    ) -> int:
+        """Create a new query history record with FTS index."""
+        now = datetime.now().isoformat()
+        async with self.get_connection() as conn:
+            # Insert into main table
+            cursor = await conn.execute(
+                """
+                INSERT INTO query_history 
+                (db_name, sql_content, natural_query, row_count, execution_time_ms, executed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (db_name, sql_content, natural_query, row_count, execution_time_ms, now),
+            )
+            history_id = cursor.lastrowid
+
+            # Insert tokenized content into FTS table
+            await conn.execute(
+                """
+                INSERT INTO query_history_fts (rowid, sql_tokens, natural_tokens)
+                VALUES (?, ?, ?)
+                """,
+                (history_id, sql_tokens, natural_tokens),
+            )
+            await conn.commit()
+
+        return history_id  # type: ignore
+
+    async def list_query_history(
+        self, db_name: str, limit: int = 20, before: str | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
+        """List query history for a database with pagination."""
+        async with self.get_connection() as conn:
+            # Get total count
+            cursor = await conn.execute(
+                "SELECT COUNT(*) FROM query_history WHERE db_name = ?",
+                (db_name,),
+            )
+            total = (await cursor.fetchone())[0]
+
+            # Build query with optional cursor
+            if before:
+                cursor = await conn.execute(
+                    """
+                    SELECT id, db_name, sql_content, natural_query, row_count, 
+                           execution_time_ms, executed_at
+                    FROM query_history
+                    WHERE db_name = ? AND executed_at < ?
+                    ORDER BY executed_at DESC
+                    LIMIT ?
+                    """,
+                    (db_name, before, limit),
+                )
+            else:
+                cursor = await conn.execute(
+                    """
+                    SELECT id, db_name, sql_content, natural_query, row_count, 
+                           execution_time_ms, executed_at
+                    FROM query_history
+                    WHERE db_name = ?
+                    ORDER BY executed_at DESC
+                    LIMIT ?
+                    """,
+                    (db_name, limit),
+                )
+
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows], total
+
+    async def search_query_history(
+        self, db_name: str, query_tokens: str, limit: int = 20
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Search query history using FTS5 full-text search."""
+        async with self.get_connection() as conn:
+            # Search using FTS5 MATCH
+            cursor = await conn.execute(
+                """
+                SELECT h.id, h.db_name, h.sql_content, h.natural_query, h.row_count, 
+                       h.execution_time_ms, h.executed_at
+                FROM query_history h
+                JOIN query_history_fts fts ON h.id = fts.rowid
+                WHERE h.db_name = ? AND query_history_fts MATCH ?
+                ORDER BY h.executed_at DESC
+                LIMIT ?
+                """,
+                (db_name, query_tokens, limit),
+            )
+            rows = await cursor.fetchall()
+            items = [dict(row) for row in rows]
+
+            # Get total count for search results
+            cursor = await conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM query_history h
+                JOIN query_history_fts fts ON h.id = fts.rowid
+                WHERE h.db_name = ? AND query_history_fts MATCH ?
+                """,
+                (db_name, query_tokens),
+            )
+            total = (await cursor.fetchone())[0]
+
+            return items, total
 
 
 # Global instance

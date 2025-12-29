@@ -9,11 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import router as v1_router
 from app.config import settings
 from app.db.sqlite import db_manager
+from app.services.tokenizer import initialize_jieba
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan handler."""
+    # Startup: Initialize jieba dictionary (preload for better performance)
+    initialize_jieba()
     # Startup: Initialize database schema
     await db_manager.init_schema()
     yield

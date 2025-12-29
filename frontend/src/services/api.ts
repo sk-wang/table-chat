@@ -10,6 +10,10 @@ import type {
   QueryRequest,
   QueryResponse,
 } from '../types';
+import type {
+  QueryHistoryListResponse,
+  QueryHistorySearchResponse,
+} from '../types/history';
 import type { DatabaseMetadata, TableListResponse, TableMetadata } from '../types/metadata';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888';
@@ -143,6 +147,40 @@ class ApiClient {
     try {
       const response: AxiosResponse<TableMetadata> = await this.client.get(
         `/dbs/${dbName}/metadata/tables/${schemaName}/${tableName}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  // === Query History Operations ===
+
+  async getQueryHistory(
+    dbName: string,
+    limit: number = 20,
+    before?: string
+  ): Promise<QueryHistoryListResponse> {
+    try {
+      const response: AxiosResponse<QueryHistoryListResponse> = await this.client.get(
+        `/dbs/${dbName}/history`,
+        { params: { limit, before } }
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async searchQueryHistory(
+    dbName: string,
+    query: string,
+    limit: number = 20
+  ): Promise<QueryHistorySearchResponse> {
+    try {
+      const response: AxiosResponse<QueryHistorySearchResponse> = await this.client.get(
+        `/dbs/${dbName}/history/search`,
+        { params: { query, limit } }
       );
       return response.data;
     } catch (error) {

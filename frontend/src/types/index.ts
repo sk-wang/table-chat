@@ -7,6 +7,7 @@ export interface DatabaseCreateRequest {
 
 export interface QueryRequest {
   sql: string;
+  naturalQuery?: string;
 }
 
 export interface NaturalQueryRequest {

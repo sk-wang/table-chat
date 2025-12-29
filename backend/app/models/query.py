@@ -9,6 +9,9 @@ class QueryRequest(CamelModel):
     """Request model for executing SQL query."""
 
     sql: str = Field(..., description="SQL SELECT statement")
+    natural_query: str | None = Field(
+        None, description="Natural language description (if SQL was generated from NL)"
+    )
 
 
 class QueryResult(CamelModel):

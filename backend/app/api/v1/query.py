@@ -1,5 +1,7 @@
 """Query execution API endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, status
 
 from app.models.error import ErrorResponse, SQLErrorResponse
@@ -10,8 +12,11 @@ from app.models.query import (
     QueryResponse,
     QueryResult,
 )
+from app.services.history_service import history_service
 from app.services.llm_service import llm_service
 from app.services.query_service import query_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/dbs", tags=["Query"])
 
@@ -36,11 +41,25 @@ async def execute_query(name: str, request: QueryRequest) -> QueryResponse:
     - Only SELECT statements are allowed
     - LIMIT 1000 is automatically added if no LIMIT clause exists
     - Returns query results as JSON
+    - Records execution in query history
     """
     try:
         final_sql, columns, rows, execution_time_ms, truncated = (
             await query_service.execute_validated_query(name, request.sql)
         )
+
+        # Record query history (fire and forget, don't block response)
+        try:
+            await history_service.create_history(
+                db_name=name,
+                sql_content=final_sql,
+                row_count=len(rows),
+                execution_time_ms=execution_time_ms,
+                natural_query=request.natural_query,
+            )
+        except Exception as history_error:
+            # Log but don't fail the query if history recording fails
+            logger.warning(f"Failed to record query history: {history_error}")
 
         return QueryResponse(
             sql=final_sql,

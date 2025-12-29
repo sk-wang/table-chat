@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Typography, Alert, Tabs, Layout, App } from 'antd';
-import { CodeOutlined, RobotOutlined } from '@ant-design/icons';
+import { CodeOutlined, RobotOutlined, HistoryOutlined, TableOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
 import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { ResizableSplitPane } from '../../components/layout/ResizableSplitPane';
+import { QueryHistoryTab } from '../../components/history';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
 import {
@@ -58,6 +59,12 @@ export const QueryPage: React.FC = () => {
   const [queryMode, setQueryMode] = useState<QueryMode>('sql');
   const [llmUnavailable, setLlmUnavailable] = useState(false);
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
+  
+  // Bottom panel state
+  const [bottomPanelTab, setBottomPanelTab] = useState<'results' | 'history'>('results');
+  const [lastNaturalQuery, setLastNaturalQuery] = useState<string | null>(null);
+  // Counter to trigger history refresh after query execution
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   // Load table list when database changes (without column details)
   //优先使用缓存，API 作为回退 (T011, T012)
@@ -166,7 +173,7 @@ export const QueryPage: React.FC = () => {
       setTableSummaries(tables);
       setTableDetails(new Map());
       message.success('Schema refreshed');
-    } catch (err) {
+    } catch {
       message.error('Failed to refresh schema');
     } finally {
       setMetadataLoading(false);
@@ -240,7 +247,11 @@ export const QueryPage: React.FC = () => {
         tables.map(t => loadTableDetails(t.schema, t.table))
       );
 
-      const response = await apiClient.executeQuery(selectedDatabase, { sql: sqlQuery });
+      // Pass natural query if this SQL was generated from NL
+      const response = await apiClient.executeQuery(selectedDatabase, { 
+        sql: sqlQuery,
+        naturalQuery: lastNaturalQuery ?? undefined,
+      });
 
       setResult(response.result);
       setExecutionTimeMs(response.executionTimeMs);
@@ -248,6 +259,12 @@ export const QueryPage: React.FC = () => {
       if (response.sql !== sqlQuery) {
         setSqlQuery(response.sql);
       }
+      
+      // Clear natural query after execution (only record once)
+      setLastNaturalQuery(null);
+      
+      // Trigger history refresh
+      setHistoryRefreshKey(prev => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Query execution failed');
       setResult(null);
@@ -280,6 +297,9 @@ export const QueryPage: React.FC = () => {
       // Set the generated SQL in the editor
       setSqlQuery(response.generatedSql);
       
+      // Store the natural language prompt for history recording
+      setLastNaturalQuery(prompt);
+      
       // Store explanation
       if (response.explanation) {
         setGeneratedExplanation(response.explanation);
@@ -302,6 +322,16 @@ export const QueryPage: React.FC = () => {
     } finally {
       setGenerating(false);
     }
+  };
+
+  // Handle selecting a history item
+  const handleSelectHistory = (sql: string, naturalQuery?: string | null) => {
+    setSqlQuery(sql);
+    setLastNaturalQuery(naturalQuery ?? null);
+    setQueryMode('sql');
+    // Switch to results tab to prepare for execution
+    setBottomPanelTab('results');
+    message.info('SQL 已复制到编辑器');
   };
 
   // Show welcome message if no databases
@@ -372,6 +402,47 @@ export const QueryPage: React.FC = () => {
           disabled={!selectedDatabase}
           llmUnavailable={llmUnavailable}
         />
+      ),
+    },
+  ];
+
+  const bottomTabItems = [
+    {
+      key: 'results',
+      label: (
+        <span>
+          <TableOutlined /> 查询结果
+        </span>
+      ),
+      children: (
+        <div style={{ flex: 1, height: '100%', overflow: 'auto' }}>
+          <QueryResultTable
+            result={result}
+            executionTimeMs={executionTimeMs}
+            loading={executing}
+            metadata={metadata}
+          />
+        </div>
+      ),
+    },
+    {
+      key: 'history',
+      label: (
+        <span>
+          <HistoryOutlined /> 执行历史
+        </span>
+      ),
+      forceRender: true, // 关键：提前渲染并加载数据，避免首次切换闪烁
+      children: (
+        <div style={{ flex: 1, height: '100%', overflow: 'hidden' }}>
+          {selectedDatabase && (
+            <QueryHistoryTab
+              dbName={selectedDatabase}
+              onSelectHistory={handleSelectHistory}
+              refreshTrigger={historyRefreshKey}
+            />
+          )}
+        </div>
       ),
     },
   ];
@@ -463,12 +534,14 @@ export const QueryPage: React.FC = () => {
               </div>
             }
             bottomPanel={
-              <div style={{ height: '100%', overflow: 'auto' }}>
-                <QueryResultTable
-                  result={result}
-                  executionTimeMs={executionTimeMs}
-                  loading={executing}
-                  metadata={metadata}
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Tabs
+                  activeKey={bottomPanelTab}
+                  onChange={(key) => setBottomPanelTab(key as 'results' | 'history')}
+                  size="small"
+                  style={{ height: '100%' }}
+                  tabBarStyle={{ marginBottom: 0 }}
+                  items={bottomTabItems}
                 />
               </div>
             }
