@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Typography,
   Button,
@@ -98,6 +98,26 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTables, setFilteredTables] = useState<TableMetadata[] | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const [treeHeight, setTreeHeight] = useState(400);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
+
+  // Track tree container height for virtual scrolling
+  useEffect(() => {
+    const container = treeContainerRef.current;
+    if (!container) return;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const height = entry.contentRect.height;
+        if (height > 0) {
+          setTreeHeight(height);
+        }
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const handleDelete = async (name: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -470,11 +490,14 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
           )}
 
           {/* Table tree */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-          }}>
+          <div 
+            ref={treeContainerRef}
+            style={{
+              flex: 1,
+              overflow: 'hidden',
+              minHeight: 0,
+            }}
+          >
             {!selectedDatabase ? (
               <div style={{ padding: '12px', textAlign: 'center' }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -499,7 +522,7 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
               <Tree
                 showIcon
                 virtual
-                height={400}
+                height={treeHeight}
                 expandedKeys={expandedKeys}
                 treeData={treeData}
                 onSelect={handleTreeSelect}
