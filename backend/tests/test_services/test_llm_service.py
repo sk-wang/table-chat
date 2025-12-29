@@ -4,7 +4,12 @@ import json
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.services.llm_service import LLMService
+from app.services.llm_service import (
+    LLMService,
+    TABLE_SELECTION_THRESHOLD,
+    MAX_SELECTED_TABLES,
+    PHASE1_MAX_TOKENS,
+)
 
 
 class TestLLMService:
@@ -278,3 +283,342 @@ class TestLLMService:
             messages = call_args.kwargs.get("messages", [])
             system_message = messages[0]["content"] if messages else ""
             assert "PostgreSQL" in system_message
+
+
+class TestPromptChain:
+    """Test suite for Prompt Chain (Table Selection) functionality."""
+
+    @pytest.fixture
+    def service(self):
+        """Create a fresh LLMService instance."""
+        return LLMService()
+
+    def test_config_constants_exist(self):
+        """Test that configuration constants are defined."""
+        assert TABLE_SELECTION_THRESHOLD == 3
+        assert MAX_SELECTED_TABLES == 10
+        assert PHASE1_MAX_TOKENS == 256
+
+    @pytest.mark.asyncio
+    async def test_build_table_summary_context_returns_correct_format(self, service):
+        """Test build_table_summary_context returns proper table summary format."""
+        mock_metadata = [
+            {
+                "schema_name": "public",
+                "table_name": "orders",
+                "table_type": "table",
+                "table_comment": "订单主表",
+            },
+            {
+                "schema_name": "public",
+                "table_name": "customers",
+                "table_type": "table",
+                "table_comment": "客户信息",
+            },
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+
+            summary, count, all_tables = await service.build_table_summary_context("testdb")
+
+            assert count == 2
+            assert "public.orders" in summary
+            assert "public.customers" in summary
+            assert "订单主表" in summary
+            assert "客户信息" in summary
+            assert "public.orders" in all_tables
+            assert "public.customers" in all_tables
+
+    @pytest.mark.asyncio
+    async def test_build_table_summary_context_no_comment(self, service):
+        """Test build_table_summary_context handles tables without comments."""
+        mock_metadata = [
+            {
+                "schema_name": "public",
+                "table_name": "users",
+                "table_type": "table",
+                "table_comment": "",  # No comment
+            },
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+
+            summary, count, all_tables = await service.build_table_summary_context("testdb")
+
+            assert count == 1
+            assert "public.users" in summary
+            assert "public.users" in all_tables
+
+    @pytest.mark.asyncio
+    async def test_build_table_summary_context_empty(self, service):
+        """Test build_table_summary_context handles empty metadata."""
+        with patch("app.db.sqlite.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=[])
+
+            summary, count, all_tables = await service.build_table_summary_context("testdb")
+
+            assert count == 0
+            assert all_tables == []
+            assert "No tables found" in summary
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_parses_json_correctly(self, service):
+        """Test select_relevant_tables correctly parses LLM JSON response."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "orders", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "customers", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "products", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
+        ]
+
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='["public.orders", "public.customers"]'))
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询订单", "postgresql")
+
+            assert not fallback
+            assert "public.orders" in selected
+            assert "public.customers" in selected
+            assert len(selected) == 2
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_fallback_on_empty_array(self, service):
+        """Test select_relevant_tables falls back when LLM returns empty array."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "orders", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "customers", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "products", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
+        ]
+
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='[]'))
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
+
+            # Should fallback to all tables
+            assert fallback
+            assert len(selected) == 4
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_skips_for_small_db(self, service):
+        """Test select_relevant_tables skips phase 1 when table count <= threshold."""
+        # Only 3 tables (at threshold)
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "orders", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "customers", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "products", "table_type": "table", "table_comment": ""},
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
+
+            # Should skip phase 1 and return all tables without calling LLM
+            assert not fallback
+            assert len(selected) == 3
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_fallback_on_invalid_json(self, service):
+        """Test select_relevant_tables falls back when LLM returns invalid JSON."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "t1", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "t2", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "t3", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "t4", "table_type": "table", "table_comment": ""},
+        ]
+
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='Not valid JSON'))
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
+
+            assert fallback
+            assert len(selected) == 4
+
+    @pytest.mark.asyncio
+    async def test_build_schema_context_filters_tables(self, service):
+        """Test build_schema_context correctly filters to specified tables."""
+        mock_metadata = [
+            {
+                "schema_name": "public",
+                "table_name": "orders",
+                "table_type": "table",
+                "columns": [{"name": "id", "dataType": "integer", "isNullable": False, "isPrimaryKey": True}],
+            },
+            {
+                "schema_name": "public",
+                "table_name": "customers",
+                "table_type": "table",
+                "columns": [{"name": "id", "dataType": "integer", "isNullable": False, "isPrimaryKey": True}],
+            },
+            {
+                "schema_name": "public",
+                "table_name": "products",
+                "table_type": "table",
+                "columns": [{"name": "id", "dataType": "integer", "isNullable": False, "isPrimaryKey": True}],
+            },
+        ]
+
+        with patch("app.services.llm_service.database_manager") as mock_mgr, \
+             patch("app.db.sqlite.db_manager") as mock_db:
+            mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+
+            # Filter to only orders table
+            result = await service.build_schema_context("testdb", table_names=["public.orders"])
+
+            assert "public.orders" in result
+            assert "public.customers" not in result
+            assert "public.products" not in result
+
+    @pytest.mark.asyncio
+    async def test_build_schema_context_no_filter_returns_all(self, service):
+        """Test build_schema_context returns all tables when no filter specified."""
+        mock_metadata = [
+            {
+                "schema_name": "public",
+                "table_name": "orders",
+                "table_type": "table",
+                "columns": [{"name": "id", "dataType": "integer", "isNullable": False, "isPrimaryKey": True}],
+            },
+            {
+                "schema_name": "public",
+                "table_name": "customers",
+                "table_type": "table",
+                "columns": [{"name": "id", "dataType": "integer", "isNullable": False, "isPrimaryKey": True}],
+            },
+        ]
+
+        with patch("app.services.llm_service.database_manager") as mock_mgr, \
+             patch("app.db.sqlite.db_manager") as mock_db:
+            mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+
+            # No filter
+            result = await service.build_schema_context("testdb", table_names=None)
+
+            assert "public.orders" in result
+            assert "public.customers" in result
+
+    @pytest.mark.asyncio
+    async def test_generate_sql_uses_prompt_chain(self, service):
+        """Test generate_sql integrates prompt chain correctly."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "t1", "table_type": "table", "table_comment": "", "columns": []},
+            {"schema_name": "public", "table_name": "t2", "table_type": "table", "table_comment": "", "columns": []},
+            {"schema_name": "public", "table_name": "t3", "table_type": "table", "table_comment": "", "columns": []},
+            {"schema_name": "public", "table_name": "t4", "table_type": "table", "table_comment": "", "columns": []},
+        ]
+
+        # Phase 1 response: select tables
+        phase1_response = MagicMock()
+        phase1_response.choices = [MagicMock(message=MagicMock(content='["public.t1", "public.t2"]'))]
+        
+        # Phase 2 response: generate SQL
+        phase2_response = MagicMock()
+        phase2_response.choices = [
+            MagicMock(message=MagicMock(content='{"sql": "SELECT * FROM public.t1", "explanation": "查询t1"}'))
+        ]
+
+        with patch("app.services.llm_service.database_manager") as mock_mgr, \
+             patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            
+            # Return different responses for phase 1 and phase 2
+            mock_client.chat.completions.create.side_effect = [phase1_response, phase2_response]
+            service._client = mock_client
+
+            sql, explanation = await service.generate_sql("testdb", "查询t1数据")
+
+            assert sql == "SELECT * FROM public.t1"
+            assert explanation == "查询t1"
+            # Should have called LLM twice (phase 1 + phase 2)
+            assert mock_client.chat.completions.create.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_filters_invalid_table_names(self, service):
+        """Test that invalid table names returned by LLM are filtered out."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "orders", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "customers", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "products", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
+        ]
+
+        mock_response = MagicMock()
+        # LLM returns a mix of valid and invalid table names
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='["public.orders", "nonexistent_table", "public.customers"]'))
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询订单", "postgresql")
+
+            assert not fallback
+            assert "public.orders" in selected
+            assert "public.customers" in selected
+            assert "nonexistent_table" not in selected
+            assert len(selected) == 2
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tables_fallback_when_all_invalid(self, service):
+        """Test fallback when all LLM-selected table names are invalid."""
+        mock_metadata = [
+            {"schema_name": "public", "table_name": "orders", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "customers", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "products", "table_type": "table", "table_comment": ""},
+            {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
+        ]
+
+        mock_response = MagicMock()
+        # All table names are invalid
+        mock_response.choices = [
+            MagicMock(message=MagicMock(content='["invalid1", "invalid2"]'))
+        ]
+
+        with patch("app.db.sqlite.db_manager") as mock_db, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
+
+            # Should fallback to all tables
+            assert fallback
+            assert len(selected) == 4
