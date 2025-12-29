@@ -117,6 +117,47 @@ export const QueryPage: React.FC = () => {
     loadTableDetails(schemaName, tableName);
   };
 
+  // Extract table names from SQL for loading metadata
+  const extractTablesFromSQL = (sql: string): Array<{schema: string, table: string}> => {
+    const tables: Array<{schema: string, table: string}> = [];
+    // Match patterns like: FROM schema.table, JOIN schema.table, FROM table, JOIN table
+    const patterns = [
+      /\bFROM\s+["']?(\w+)["']?\.["']?(\w+)["']?/gi,
+      /\bJOIN\s+["']?(\w+)["']?\.["']?(\w+)["']?/gi,
+      /\bFROM\s+["']?(\w+)["']?(?:\s|$|,|\))/gi,
+      /\bJOIN\s+["']?(\w+)["']?(?:\s|$|,|\))/gi,
+    ];
+    
+    // Match schema.table patterns
+    for (const pattern of patterns.slice(0, 2)) {
+      let match;
+      while ((match = pattern.exec(sql)) !== null) {
+        tables.push({ schema: match[1], table: match[2] });
+      }
+    }
+    
+    // Match single table patterns (assume 'public' schema)
+    for (const pattern of patterns.slice(2)) {
+      let match;
+      while ((match = pattern.exec(sql)) !== null) {
+        // Skip SQL keywords
+        const tableName = match[1].toLowerCase();
+        if (!['select', 'where', 'order', 'group', 'having', 'limit', 'offset', 'union', 'inner', 'left', 'right', 'outer', 'cross', 'on', 'and', 'or'].includes(tableName)) {
+          tables.push({ schema: 'public', table: match[1] });
+        }
+      }
+    }
+    
+    // Deduplicate
+    const seen = new Set<string>();
+    return tables.filter(t => {
+      const key = `${t.schema}.${t.table}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const handleExecute = async () => {
     if (!selectedDatabase || !sqlQuery.trim()) {
       return;
@@ -127,6 +168,12 @@ export const QueryPage: React.FC = () => {
       setError(null);
       setResult(null);
       setGeneratedExplanation(null);
+
+      // Load metadata for tables in the query (for column comments)
+      const tables = extractTablesFromSQL(sqlQuery);
+      await Promise.all(
+        tables.map(t => loadTableDetails(t.schema, t.table))
+      );
 
       const response = await apiClient.executeQuery(selectedDatabase, { sql: sqlQuery });
 
