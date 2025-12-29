@@ -1,6 +1,6 @@
 # TableChat - 智能数据库查询工具
 
-一个现代化的数据库查询工具，支持 **PostgreSQL** 和 **MySQL** 数据库，提供 SQL 编辑器和自然语言查询功能。
+一个现代化的数据库查询工具，支持 **PostgreSQL** 和 **MySQL** 数据库，提供 SQL 编辑器、自然语言查询、查询结果导出和执行历史记录功能。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.13+-green.svg)
@@ -19,6 +19,7 @@
 - 快捷键支持（Ctrl+Enter 执行查询）
 - 仅允许 SELECT 语句（安全限制）
 - 未指定 LIMIT 时自动添加 LIMIT 1000
+- **可调节面板比例**：编辑器与结果区域大小可拖拽调整，自动记忆
 
 ### 🤖 智能自然语言查询
 - 用自然语言描述需求，AI 自动生成 SQL
@@ -27,12 +28,25 @@
   - 第二阶段：基于选定表生成精准 SQL
 - 支持 PostgreSQL 和 MySQL 方言
 - 生成结果包含中文解释
+- **智能导出识别**：识别"导出为 CSV"等意图自动触发导出
 
-### 📊 结果展示
+### 📊 结果展示与导出
 - 表格形式展示查询结果
 - 支持分页和排序
 - 显示执行时间和行数
 - 结果截断提示
+- **导出功能**：支持 CSV、JSON、XLSX 三种格式
+  - CSV：UTF-8 编码，Excel 兼容
+  - JSON：格式化输出，2 空格缩进
+  - XLSX：标准 Excel 格式，自动列宽
+
+### 📜 SQL 执行历史
+- 自动记录每次成功执行的 SQL 查询
+- 记录执行时间、返回行数、耗时信息
+- 保存自然语言描述（如有）
+- **全文搜索**：支持中文关键词搜索（jieba 分词）
+- 点击历史记录快速复用 SQL
+- 表格形式展示，参考阿里云 DMS 风格
 
 ### 🔍 Schema 浏览器
 - 查看数据库表结构、字段信息
@@ -45,24 +59,26 @@
 - **浏览器本地缓存**：减少重复请求，提升响应速度
 - 元数据智能缓存
 - 查询结果快速渲染
+- 按需加载表详情
 
 ## 🛠️ 技术栈
 
 ### 后端
 - **Python 3.13+** - 使用 uv 管理依赖
 - **FastAPI** - 高性能异步 API 框架
-- **SQLite** - 元数据存储
-- **psycopg2** - PostgreSQL 连接
-- **mysql-connector-python** - MySQL 连接
+- **SQLite** - 元数据存储 + FTS5 全文搜索
+- **asyncpg** - PostgreSQL 异步连接
+- **aiomysql** - MySQL 异步连接
 - **sqlglot** - SQL 解析与验证
 - **OpenAI SDK** - LLM 自然语言处理
+- **jieba** - 中文分词（支持中文搜索）
 
 ### 前端
-- **React 18** + TypeScript
+- **React 19** + TypeScript 5.9
 - **Refine 5** - 管理后台框架
-- **Ant Design** - UI 组件库
+- **Ant Design 5** - UI 组件库
 - **Monaco Editor** - 代码编辑器
-- **Tailwind CSS** - 样式框架
+- **xlsx (SheetJS)** - Excel 导出
 - **localStorage** - 浏览器本地缓存
 
 ## 🚀 快速开始
@@ -144,6 +160,23 @@ mysql://user:password@localhost:3306/mydb
 - 仅支持 SELECT 语句（安全限制）
 - 未指定 LIMIT 时自动添加 LIMIT 1000
 
+### 导出查询结果
+
+执行查询后，可以通过以下方式导出结果：
+
+**方式一：工具栏按钮**
+1. 执行 SQL 查询获得结果
+2. 点击结果区域上方的「导出」下拉按钮
+3. 选择导出格式：CSV / JSON / XLSX
+
+**方式二：自然语言触发**
+1. 在自然语言输入框中描述需求，包含导出意图
+   - 例如："查询所有用户并导出为 CSV"
+   - 例如："导出最近30天的订单数据为 Excel"
+2. 系统自动生成 SQL 并在执行后自动导出
+
+导出文件命名格式：`{数据库名}_{时间戳}.{格式}`
+
 ### 自然语言查询
 
 1. 切换到 **自然语言** 标签
@@ -152,6 +185,13 @@ mysql://user:password@localhost:3306/mydb
 4. 检查生成的 SQL 后执行
 
 **提示：** 系统会自动识别相关表，即使数据库有数千张表也能快速生成准确的 SQL。
+
+### 查看执行历史
+
+1. 切换到结果区域的 **执行历史** 标签
+2. 查看过去执行的 SQL 记录
+3. 使用搜索框按关键词过滤（支持中文）
+4. 点击历史记录将 SQL 复制到编辑器
 
 ### 浏览数据库结构
 
@@ -171,8 +211,8 @@ tableChat/
 │   │   ├── api/v1/         # API 路由
 │   │   ├── connectors/     # 数据库连接器（PostgreSQL/MySQL）
 │   │   ├── models/         # Pydantic 模型
-│   │   ├── services/       # 业务逻辑（含 LLM 服务）
-│   │   └── db/             # SQLite 元数据存储
+│   │   ├── services/       # 业务逻辑（LLM、历史记录等）
+│   │   └── db/             # SQLite 存储 + FTS5 全文搜索
 │   ├── tests/              # 测试用例
 │   └── pyproject.toml
 ├── frontend/               # React 前端
@@ -180,12 +220,15 @@ tableChat/
 │   │   ├── components/     # React 组件
 │   │   │   ├── database/   # 数据库管理组件
 │   │   │   ├── editor/     # SQL 编辑器组件
+│   │   │   ├── export/     # 导出功能组件
+│   │   │   ├── history/    # 执行历史组件
 │   │   │   ├── results/    # 查询结果组件
 │   │   │   ├── sidebar/    # 侧边栏（含表搜索）
-│   │   │   └── layout/     # 布局组件
+│   │   │   └── layout/     # 布局组件（可调节面板）
 │   │   ├── pages/          # 页面
 │   │   ├── contexts/       # React Context
-│   │   ├── services/       # API 客户端
+│   │   ├── services/       # API 客户端 + 缓存服务
+│   │   ├── test/           # 单元测试
 │   │   └── types/          # TypeScript 类型
 │   ├── e2e/                # E2E 测试
 │   └── package.json
@@ -216,7 +259,7 @@ uv run pytest -m "not integration"
 ```bash
 cd frontend
 
-# 单元测试
+# 单元测试（111 个测试用例）
 npm run test
 
 # E2E 测试（需要先启动服务）
@@ -236,7 +279,8 @@ npm run test:e2e:ui
 | GET | `/api/v1/dbs/{name}` | 获取数据库详情 |
 | PUT | `/api/v1/dbs/{name}` | 创建/更新数据库连接 |
 | DELETE | `/api/v1/dbs/{name}` | 删除数据库连接 |
-| GET | `/api/v1/dbs/{name}/metadata` | 获取表结构元数据 |
+| GET | `/api/v1/dbs/{name}/metadata/tables` | 获取表列表 |
+| GET | `/api/v1/dbs/{name}/metadata/tables/{schema}/{table}` | 获取表详情 |
 
 ### 查询执行
 
@@ -244,6 +288,13 @@ npm run test:e2e:ui
 |------|------|------|
 | POST | `/api/v1/dbs/{name}/query` | 执行 SQL 查询 |
 | POST | `/api/v1/dbs/{name}/query/natural` | 自然语言生成 SQL |
+
+### 执行历史
+
+| 方法 | 端点 | 描述 |
+|------|------|------|
+| GET | `/api/v1/dbs/{name}/history` | 获取执行历史列表 |
+| GET | `/api/v1/dbs/{name}/history/search?query=xxx` | 搜索执行历史 |
 
 完整 API 文档请访问：http://localhost:7888/docs
 
@@ -266,8 +317,10 @@ npm run test:e2e:ui
 - [x] 表搜索功能
 - [x] 两阶段提示链（支持大型数据库）
 - [x] 浏览器本地缓存
-- [ ] 导出功能（CSV/JSON）
-- [ ] SQL 执行历史记录
+- [x] 可调节查询面板比例
+- [x] SQL 执行历史记录（含中文搜索）
+- [x] 导出功能（CSV/JSON/XLSX）
+- [x] 自然语言触发导出
 - [ ] SSH 隧道支持
 
 ## 📄 License
@@ -278,4 +331,6 @@ MIT License - 详见 [LICENSE](LICENSE)
 
 - [快速开始指南](QUICKSTART.md)
 - [测试指南](TESTING.md)
+- [代码分析报告](CODEBASE_ANALYSIS.md)
+- [导出功能设计](specs/010-query-export/spec.md)
 - [API 测试集合](api-tests.rest)
