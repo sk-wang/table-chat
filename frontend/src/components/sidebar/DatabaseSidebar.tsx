@@ -184,41 +184,48 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
         </Text>
       ),
       icon: <DatabaseOutlined style={{ color: '#6897bb' }} />,
-      children: tables.map(table => ({
-        key: `table-${schema}-${table.tableName}`,
-        title: (
-          <div style={{ color: '#a9b7c6', fontSize: 12, whiteSpace: 'normal', wordBreak: 'break-word', padding: '2px 0' }}>
-            {table.tableName}
-            <span style={{ color: '#666', marginLeft: 4, fontSize: 10 }}>
-              ({table.columns?.length || 0} cols)
-            </span>
-            <CommentText comment={table.comment} />
-          </div>
-        ),
-        icon: table.tableType === 'view' 
-          ? <EyeOutlined style={{ color: '#cc7832' }} />
-          : <TableOutlined style={{ color: '#6a8759' }} />,
-        // Add columns as children
-        children: (table.columns || []).map(column => ({
-          key: `column-${schema}-${table.tableName}-${column.name}`,
+      children: tables.map(table => {
+        const hasColumns = table.columns && table.columns.length > 0;
+        return {
+          key: `table-${schema}-${table.tableName}`,
           title: (
-            <div style={{ fontSize: 11, color: '#a9b7c6', whiteSpace: 'normal', wordBreak: 'break-word', padding: '1px 0' }}>
-              {column.isPrimaryKey && (
-                <KeyOutlined style={{ color: '#faad14', marginRight: 4, fontSize: 10 }} />
-              )}
-              <span style={{ color: column.isPrimaryKey ? '#faad14' : '#a9b7c6' }}>
-                {column.name}
+            <div style={{ color: '#a9b7c6', fontSize: 12, whiteSpace: 'normal', wordBreak: 'break-word', padding: '2px 0' }}>
+              {table.tableName}
+              <span style={{ color: '#666', marginLeft: 4, fontSize: 10 }}>
+                ({table.columns?.length || 0} cols)
               </span>
-              <span style={{ color: '#666', marginLeft: 6 }}>
-                {column.dataType}
-                {!column.isNullable && <span style={{ color: '#cc7832' }}> NOT NULL</span>}
-              </span>
-              <CommentText comment={column.comment} />
+              <CommentText comment={table.comment} />
             </div>
           ),
-          isLeaf: true,
-        })),
-      })),
+          icon: table.tableType === 'view' 
+            ? <EyeOutlined style={{ color: '#cc7832' }} />
+            : <TableOutlined style={{ color: '#6a8759' }} />,
+          // Always allow expansion - columns will be loaded on demand
+          isLeaf: false,
+          // Add columns as children if loaded
+          children: hasColumns 
+            ? table.columns.map(column => ({
+                key: `column-${schema}-${table.tableName}-${column.name}`,
+                title: (
+                  <div style={{ fontSize: 11, color: '#a9b7c6', whiteSpace: 'normal', wordBreak: 'break-word', padding: '1px 0' }}>
+                    {column.isPrimaryKey && (
+                      <KeyOutlined style={{ color: '#faad14', marginRight: 4, fontSize: 10 }} />
+                    )}
+                    <span style={{ color: column.isPrimaryKey ? '#faad14' : '#a9b7c6' }}>
+                      {column.name}
+                    </span>
+                    <span style={{ color: '#666', marginLeft: 6 }}>
+                      {column.dataType}
+                      {!column.isNullable && <span style={{ color: '#cc7832' }}> NOT NULL</span>}
+                    </span>
+                    <CommentText comment={column.comment} />
+                  </div>
+                ),
+                isLeaf: true,
+              }))
+            : undefined, // No children yet - will be loaded on expand
+        };
+      }),
     }));
   }, [displayTables]);
 
