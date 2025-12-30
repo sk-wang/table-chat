@@ -190,15 +190,37 @@ export const QueryPage: React.FC = () => {
     loadTableDetails(schemaName, tableName);
   };
 
+  // Get default schema for current database
+  // For PostgreSQL: 'public', for MySQL: the database name (first schema from tableSummaries)
+  const getDefaultSchema = (): string => {
+    // Get current database info
+    const currentDb = databases.find(db => db.name === selectedDatabase);
+    
+    if (currentDb?.dbType === 'mysql') {
+      // For MySQL, get schema from loaded table summaries
+      if (tableSummaries && tableSummaries.length > 0) {
+        return tableSummaries[0].schemaName;
+      }
+      // Fallback: if no tables loaded yet, return empty string (will try to match anyway)
+      return '';
+    }
+    
+    // Default for PostgreSQL
+    return 'public';
+  };
+
   // Extract table names from SQL for loading metadata
   const extractTablesFromSQL = (sql: string): Array<{schema: string, table: string}> => {
     const tables: Array<{schema: string, table: string}> = [];
+    const defaultSchema = getDefaultSchema();
+    
     // Match patterns like: FROM schema.table, JOIN schema.table, FROM table, JOIN table
+    // Also handle MySQL backtick syntax: FROM `schema`.`table`, FROM `table`
     const patterns = [
-      /\bFROM\s+["']?(\w+)["']?\.["']?(\w+)["']?/gi,
-      /\bJOIN\s+["']?(\w+)["']?\.["']?(\w+)["']?/gi,
-      /\bFROM\s+["']?(\w+)["']?(?:\s|$|,|\))/gi,
-      /\bJOIN\s+["']?(\w+)["']?(?:\s|$|,|\))/gi,
+      /\bFROM\s+[`"']?(\w+)[`"']?\.[`"']?(\w+)[`"']?/gi,
+      /\bJOIN\s+[`"']?(\w+)[`"']?\.[`"']?(\w+)[`"']?/gi,
+      /\bFROM\s+[`"']?(\w+)[`"']?(?:\s|$|,|\))/gi,
+      /\bJOIN\s+[`"']?(\w+)[`"']?(?:\s|$|,|\))/gi,
     ];
     
     // Match schema.table patterns
@@ -209,14 +231,14 @@ export const QueryPage: React.FC = () => {
       }
     }
     
-    // Match single table patterns (assume 'public' schema)
+    // Match single table patterns (use detected default schema)
     for (const pattern of patterns.slice(2)) {
       let match;
       while ((match = pattern.exec(sql)) !== null) {
         // Skip SQL keywords
         const tableName = match[1].toLowerCase();
         if (!['select', 'where', 'order', 'group', 'having', 'limit', 'offset', 'union', 'inner', 'left', 'right', 'outer', 'cross', 'on', 'and', 'or'].includes(tableName)) {
-          tables.push({ schema: 'public', table: match[1] });
+          tables.push({ schema: defaultSchema, table: match[1] });
         }
       }
     }
@@ -338,7 +360,7 @@ export const QueryPage: React.FC = () => {
         // We'll use a ref or state to track this
         sessionStorage.setItem('pendingExportFormat', response.exportFormat);
       } else {
-        message.success('SQL 生成成功！您可以检查并执行生成的查询。');
+      message.success('SQL 生成成功！您可以检查并执行生成的查询。');
       }
 
     } catch (err) {
@@ -459,12 +481,12 @@ export const QueryPage: React.FC = () => {
           )}
           {/* 查询结果表格 */}
           <div style={{ flex: 1, overflow: 'auto' }}>
-            <QueryResultTable
-              result={result}
-              executionTimeMs={executionTimeMs}
-              loading={executing}
-              metadata={metadata}
-            />
+          <QueryResultTable
+            result={result}
+            executionTimeMs={executionTimeMs}
+            loading={executing}
+            metadata={metadata}
+          />
           </div>
         </div>
       ),

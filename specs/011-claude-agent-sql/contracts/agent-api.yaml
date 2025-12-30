@@ -1,0 +1,232 @@
+openapi: 3.0.3
+info:
+  title: TableChat Agent API
+  version: 1.0.0
+  description: Agent 模式 API，支持通过 Claude Agent SDK 进行智能数据库探索和 SQL 生成
+
+servers:
+  - url: /api/v1
+    description: API v1
+
+paths:
+  /dbs/{name}/agent/query:
+    post:
+      summary: 启动 Agent 会话
+      description: |
+        通过 Server-Sent Events (SSE) 流式返回 Agent 的处理过程和结果。
+        
+        事件类型:
+        - `thinking`: Agent 思考状态
+        - `tool_call`: 工具调用开始/完成
+        - `tool_result`: 工具执行结果
+        - `message`: Assistant 消息
+        - `sql`: 生成的最终 SQL
+        - `error`: 错误信息
+        - `done`: 处理完成
+      tags:
+        - Agent
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库名称
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentQueryRequest'
+      responses:
+        '200':
+          description: SSE 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+              examples:
+                thinking:
+                  value: |
+                    event: thinking
+                    data: {"status": "analyzing", "message": "正在分析您的需求..."}
+                tool_call:
+                  value: |
+                    event: tool_call
+                    data: {"id": "tc_1", "tool": "get_table_schema", "input": {}, "status": "running"}
+                sql:
+                  value: |
+                    event: sql
+                    data: {"sql": "SELECT SUM(amount) FROM orders", "explanation": "查询订单总金额"}
+                done:
+                  value: |
+                    event: done
+                    data: {"totalTimeMs": 5230, "toolCallsCount": 2}
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 数据库不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Agent 服务不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /dbs/{name}/agent/cancel:
+    post:
+      summary: 取消 Agent 任务
+      description: 取消正在进行的 Agent 任务
+      tags:
+        - Agent
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: 数据库名称
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cancelled:
+                    type: boolean
+                    example: true
+        '404':
+          description: 没有正在进行的任务
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /agent/status:
+    get:
+      summary: 获取 Agent 服务状态
+      description: 检查 Agent 服务是否已配置并可用
+      tags:
+        - Agent
+      responses:
+        '200':
+          description: Agent 状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatus'
+
+components:
+  schemas:
+    AgentQueryRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: 用户的自然语言请求
+          example: 帮我查询订单总金额
+
+    AgentStatus:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Agent 服务是否可用
+        configured:
+          type: boolean
+          description: Agent 是否已配置
+        model:
+          type: string
+          description: 使用的模型名称
+          example: claude-sonnet-4-5
+
+    ThinkingEventData:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [analyzing, planning, generating]
+        message:
+          type: string
+          example: 正在分析您的需求...
+
+    ToolCallEventData:
+      type: object
+      properties:
+        id:
+          type: string
+          example: tc_1
+        tool:
+          type: string
+          enum: [query_database, get_table_schema]
+        input:
+          type: object
+        status:
+          type: string
+          enum: [running, completed, error]
+        output:
+          type: string
+        durationMs:
+          type: integer
+          example: 150
+
+    MessageEventData:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [assistant]
+        content:
+          type: string
+
+    SQLEventData:
+      type: object
+      properties:
+        sql:
+          type: string
+          example: SELECT SUM(amount) FROM orders
+        explanation:
+          type: string
+          example: 查询订单表中金额的总和
+
+    ErrorEventData:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Tool execution failed
+        detail:
+          type: string
+
+    DoneEventData:
+      type: object
+      properties:
+        totalTimeMs:
+          type: integer
+          example: 5230
+        toolCallsCount:
+          type: integer
+          example: 2
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+
