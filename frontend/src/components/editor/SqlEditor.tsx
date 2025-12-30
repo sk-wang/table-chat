@@ -1,6 +1,8 @@
 import React, { useRef } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import type { editor } from 'monaco-editor';
+
+// Infer editor type from OnMount callback parameters
+type EditorInstance = Parameters<OnMount>[0];
 
 interface SqlEditorProps {
   value: string;
@@ -15,7 +17,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   onExecute,
   readOnly = false,
 }) => {
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<EditorInstance | null>(null);
 
   const handleEditorDidMount: OnMount = (editorInstance, monacoInstance) => {
     editorRef.current = editorInstance;

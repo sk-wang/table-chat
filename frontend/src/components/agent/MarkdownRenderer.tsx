@@ -88,7 +88,7 @@ renderer.codespan = ({ text }: { text: string }) => {
 };
 
 // Custom link rendering (open in new tab)
-renderer.link = ({ href, title, text }: { href: string; title?: string; text: string }) => {
+renderer.link = ({ href, title, text }: { href: string; title?: string | null; text: string }) => {
   const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
   return `<a href="${escapeHtml(href)}"${titleAttr} target="_blank" rel="noopener noreferrer">${text}</a>`;
 };

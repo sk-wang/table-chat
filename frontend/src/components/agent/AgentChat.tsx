@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Input, Button, Space, Alert } from 'antd';
+import { Input, Button, Alert } from 'antd';
 import { SendOutlined, StopOutlined, CopyOutlined, RobotOutlined } from '@ant-design/icons';
 import { AgentMessage } from './AgentMessage';
 import { ThinkingIndicator } from './ThinkingIndicator';

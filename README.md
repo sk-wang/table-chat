@@ -93,8 +93,51 @@
 
 ## 🚀 快速开始
 
-### 前置要求
+### 方式一：Docker 部署（推荐）⭐
 
+使用 Docker 一键启动，无需安装 Python 和 Node.js 环境。
+
+**前置要求**：
+- Docker 24.0+
+- Docker Compose V2
+
+**启动步骤**：
+
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd tableChat
+
+# 2. (可选) 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置 LLM_API_KEY 和 AGENT_API_KEY
+
+# 3. 启动所有服务
+docker compose up --build
+
+# 或后台运行
+docker compose up --build -d
+```
+
+**访问应用**：
+- 前端：http://localhost:5888
+- 后端 API：http://localhost:7888/docs
+
+**停止服务**：
+```bash
+docker compose down
+```
+
+**查看日志**：
+```bash
+docker compose logs -f
+```
+
+---
+
+### 方式二：本地开发部署
+
+**前置要求**：
 - Python 3.13+ (推荐使用 [uv](https://github.com/astral-sh/uv))
 - Node.js 18+
 - PostgreSQL 或 MySQL 数据库（作为查询目标）

@@ -106,8 +106,7 @@ AI Agent 任务分解：在 Claude Code 中，尝试将“导出数据”这个�
 查询结果和SQL编辑器中间做一个可调节这两个部分比例的滑块，并且把上次调整的位置记录到localstorage里面去。
 
 ## 支持SSH
-
-## 增加打包成桌面程序的构建方式
+需要支持SSH，以访问一些不能直连的数据库
 
 ## 利用claude code sdk完成sql的生成
 把现在的自然语言的功能叫做普通模式，保留，再加一个agent模式，可以在普通模式和agent模式之间切换切换的。agent模式采用claude code sdk，来实现一个agent，配置是这俩：(export ANTHROPIC_BASE_URL="http://localhost:3000/api"
@@ -115,3 +114,13 @@ export ANTHROPIC_AUTH_TOKEN="cr_f750d122c1827568ff5899ba947d512a5381285a8d80ce76
 给他提供一个查询sql的工具，这个工具不能执行删更改和DDL的操作。能用这个工具探索数据库，给出对应的sql。前端的展示模仿claude code vscode插件那种交互方式，但是可以简化一点，因为我们只有生成sql这一个功能。
 
 UI 布局方案，应该是和自然语言做一个同级的选项卡agent，然后执行的不只是select，还有一些describe之类的探索表结构的命令。最后根据意图生成的可以是select以外的sql，比如创建索引类的，我可以在其他工具里执行。
+
+
+## 编写dockerfile和docker-compose文件
+使得程序能靠docker一键启动，方便使用
+
+## 增加收藏sql的功能
+方便人检索，方便大模型召回，快速学习经验
+
+## 写一个github吸引眼球的readme文件
+重点体现 AI Agent的功能，然后部署只写docker，readme里面不写其他部署模式了。
