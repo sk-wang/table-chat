@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Typography, Alert, Tabs, Layout, App } from 'antd';
-import { CodeOutlined, RobotOutlined, HistoryOutlined, TableOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { CodeOutlined, RobotOutlined, HistoryOutlined, TableOutlined } from '@ant-design/icons';
 import { SqlEditor } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
-import { AgentChat } from '../../components/agent';
+import { AgentSidebar } from '../../components/agent';
 import { DatabaseSidebar } from '../../components/sidebar/DatabaseSidebar';
 import { ResizableSplitPane } from '../../components/layout/ResizableSplitPane';
 import { QueryHistoryTab } from '../../components/history';
@@ -25,7 +25,7 @@ import type { TableMetadata, TableSummary } from '../../types/metadata';
 const { Title, Text } = Typography;
 const { Sider, Content } = Layout;
 
-type QueryMode = 'sql' | 'natural' | 'agent';
+type QueryMode = 'sql' | 'natural';
 
 export const QueryPage: React.FC = () => {
   // Ant Design App context for message API
@@ -60,21 +60,7 @@ export const QueryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [queryMode, setQueryMode] = useState<QueryMode>('sql');
   const [llmUnavailable, setLlmUnavailable] = useState(false);
-  const [agentUnavailable, setAgentUnavailable] = useState(false);
   const [generatedExplanation, setGeneratedExplanation] = useState<string | null>(null);
-
-  // Check Agent availability on mount
-  useEffect(() => {
-    const checkAgentStatus = async () => {
-      try {
-        const status = await apiClient.getAgentStatus();
-        setAgentUnavailable(!status.available && !status.configured);
-      } catch {
-        setAgentUnavailable(true);
-      }
-    };
-    checkAgentStatus();
-  }, []);
   
   // Bottom panel state
   const [bottomPanelTab, setBottomPanelTab] = useState<'results' | 'history'>('results');
@@ -402,8 +388,7 @@ export const QueryPage: React.FC = () => {
     message.info('SQL 已复制到编辑器');
   };
 
-  // Handle SQL generated from Agent mode
-  // IMPORTANT: This hook must be defined BEFORE any conditional returns
+  // Handle SQL generated from Agent sidebar
   const handleAgentSQLGenerated = useCallback((sql: string) => {
     setSqlQuery(sql);
     setQueryMode('sql');
@@ -477,22 +462,6 @@ export const QueryPage: React.FC = () => {
           loading={generating}
           disabled={!selectedDatabase}
           llmUnavailable={llmUnavailable}
-        />
-      ),
-    },
-    {
-      key: 'agent',
-      label: (
-        <span>
-          <ThunderboltOutlined /> Agent
-        </span>
-      ),
-      children: (
-        <AgentChat
-          dbName={selectedDatabase || ''}
-          disabled={!selectedDatabase}
-          agentUnavailable={agentUnavailable}
-          onSQLGenerated={handleAgentSQLGenerated}
         />
       ),
     },
@@ -657,6 +626,13 @@ export const QueryPage: React.FC = () => {
           />
         </div>
       </Content>
+
+      {/* Agent Sidebar - Right side */}
+      <AgentSidebar
+        dbName={selectedDatabase || ''}
+        disabled={!selectedDatabase}
+        onSQLGenerated={handleAgentSQLGenerated}
+      />
     </Layout>
   );
 };

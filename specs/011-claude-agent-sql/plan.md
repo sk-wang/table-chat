@@ -5,13 +5,15 @@
 
 ## Summary
 
-为 TableChat 添加 Agent 模式，基于 Claude Agent SDK for Python 实现智能数据库探索和 SQL 生成。Agent 模式与现有的"自然语言"模式作为同级选项卡并存，用户可自由切换。Agent 通过 MCP 工具探索数据库（只读查询），可生成任意类型的 SQL（包括 DDL）供用户在其他工具执行。
+为 TableChat 添加 Agent 模式，基于 **Anthropic Python 客户端** 实现智能数据库探索和 SQL 生成。Agent 模式与现有的"自然语言"模式作为同级选项卡并存，用户可自由切换。Agent 通过 Tool Use 功能探索数据库（只读查询），可生成任意类型的 SQL（包括 DDL）供用户在其他工具执行。
+
+> **注意**: 最初计划使用 Claude Agent SDK，但由于其基于子进程的架构不适合 Web 服务器的 SSE 实时流式输出，已改用 Anthropic Python 客户端的原生 Tool Use 功能。
 
 ## Technical Context
 
 **Language/Version**: Python 3.11 (后端), TypeScript 5.x (前端)  
 **Primary Dependencies**: 
-- 后端: FastAPI, claude-agent-sdk, sqlglot
+- 后端: FastAPI, anthropic (Anthropic Python Client), sqlglot
 - 前端: React 18, Ant Design, Monaco Editor  
 
 **Storage**: SQLite (本地元数据缓存), 目标数据库 (PostgreSQL/MySQL)  
@@ -28,7 +30,7 @@
 | Check | Status | Notes |
 |-------|--------|-------|
 | 单一职责 | ✅ | Agent 服务独立于现有 LLM 服务 |
-| 最小依赖 | ✅ | 仅新增 claude-agent-sdk |
+| 最小依赖 | ✅ | 仅新增 anthropic Python 客户端 |
 | 复用现有 | ✅ | 复用 query_service、db_manager、metadata 服务 |
 | 无重复造轮子 | ✅ | 使用官方 SDK，不自行实现 Agent 逻辑 |
 

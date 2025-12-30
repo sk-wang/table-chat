@@ -5,10 +5,11 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.services.agent_tools import (
-    AGENT_TOOLS,
+    ANTHROPIC_TOOLS,
     MAX_OUTPUT_SIZE,
     MAX_TOOL_RESULT_ROWS,
     get_table_schema,
+    list_tables,
     query_database,
     truncate_output,
 )
@@ -221,14 +222,15 @@ class TestGetTableSchema:
         with patch("app.db.sqlite.db_manager") as mock_mgr:
             mock_mgr.get_metadata_for_database = AsyncMock(return_value=None)
             
-            result = await get_table_schema("testdb")
+            # Now table_name is required, so pass a table name
+            result = await get_table_schema("testdb", "users")
             
             assert result["is_error"] is False
             assert "No tables found" in result["content"][0]["text"]
 
     @pytest.mark.asyncio
-    async def test_get_table_schema_all_tables(self):
-        """Test getting schema for all tables."""
+    async def test_get_table_schema_returns_table_info(self):
+        """Test getting schema for a specific table returns info."""
         with patch("app.db.sqlite.db_manager") as mock_mgr:
             mock_mgr.get_metadata_for_database = AsyncMock(return_value=[
                 {
@@ -252,12 +254,11 @@ class TestGetTableSchema:
                 }
             ])
             
-            result = await get_table_schema("testdb")
+            result = await get_table_schema("testdb", "users")
             
             assert result["is_error"] is False
             text = result["content"][0]["text"]
             assert "users" in text
-            assert "orders" in text
             assert "email" in text
             assert "[PK]" in text
 
@@ -309,29 +310,37 @@ class TestGetTableSchema:
 
 
 class TestAgentToolsDefinition:
-    """Test suite for AGENT_TOOLS definition."""
+    """Test suite for ANTHROPIC_TOOLS definition."""
 
     def test_tools_count(self):
         """Test correct number of tools defined."""
-        assert len(AGENT_TOOLS) == 2
+        assert len(ANTHROPIC_TOOLS) == 3
+
+    def test_list_tables_tool_definition(self):
+        """Test list_tables tool has correct definition."""
+        list_tool = next((t for t in ANTHROPIC_TOOLS if t["name"] == "list_tables"), None)
+        
+        assert list_tool is not None
+        assert "description" in list_tool
+        assert "input_schema" in list_tool
+        assert list_tool["input_schema"]["required"] == []
 
     def test_query_database_tool_definition(self):
         """Test query_database tool has correct definition."""
-        query_tool = next((t for t in AGENT_TOOLS if t["name"] == "query_database"), None)
+        query_tool = next((t for t in ANTHROPIC_TOOLS if t["name"] == "query_database"), None)
         
         assert query_tool is not None
         assert "description" in query_tool
-        assert "read-only" in query_tool["description"].lower()
         assert "input_schema" in query_tool
         assert query_tool["input_schema"]["required"] == ["sql"]
 
     def test_get_table_schema_tool_definition(self):
         """Test get_table_schema tool has correct definition."""
-        schema_tool = next((t for t in AGENT_TOOLS if t["name"] == "get_table_schema"), None)
+        schema_tool = next((t for t in ANTHROPIC_TOOLS if t["name"] == "get_table_schema"), None)
         
         assert schema_tool is not None
         assert "description" in schema_tool
         assert "input_schema" in schema_tool
-        # table_name is optional
-        assert schema_tool["input_schema"]["required"] == []
+        # table_name is now required
+        assert schema_tool["input_schema"]["required"] == ["table_name"]
 

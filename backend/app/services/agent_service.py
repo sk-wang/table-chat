@@ -1,94 +1,90 @@
-"""Agent service for Claude Agent SDK integration."""
+"""Agent service using Anthropic Python client with Tool Use."""
 
 import asyncio
-import json
 import logging
 import re
 import time
-import uuid
 from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.config import settings
-from app.services.agent_tools import get_table_schema, query_database
+from app.services.agent_tools import ANTHROPIC_TOOLS, execute_tool
+
+if TYPE_CHECKING:
+    from app.models.agent import ConversationTurn
 
 logger = logging.getLogger(__name__)
 
 
 # System prompt for the SQL assistant agent
-AGENT_SYSTEM_PROMPT = """You are a SQL assistant agent helping users explore databases and generate SQL queries.
+AGENT_SYSTEM_PROMPT = """你是一个 SQL 助手，帮助用户探索数据库并生成 SQL 查询。
 
-You have access to two tools:
-1. `get_table_schema` - Get table structure information (tables, columns, types, comments)
-2. `query_database` - Execute read-only SQL queries (SELECT, DESCRIBE, SHOW, EXPLAIN only)
+你有以下三个工具可用：
+1. `list_tables` - 列出数据库中所有表的名称（先用这个探索数据库）
+2. `get_table_schema` - 获取指定表的详细结构（列名、类型、注释）
+3. `query_database` - 执行只读 SQL 查询（仅支持 SELECT、DESCRIBE、SHOW、EXPLAIN）
 
-Your workflow:
-1. First, use `get_table_schema` to understand the database structure
-2. If needed, use `query_database` to run sample queries and understand the data
-3. Based on your exploration, generate the final SQL that fulfills the user's request
+工作流程：
+1. 首先使用 `list_tables` 查看有哪些表
+2. 然后使用 `get_table_schema` 了解需要的表的结构
+3. 如果需要，使用 `query_database` 执行示例查询
+4. 最后生成满足用户需求的 SQL
 
-Important:
-- The `query_database` tool can ONLY execute read-only queries
-- However, you CAN generate DDL statements (CREATE INDEX, ALTER TABLE, etc.) as your final answer
-- The user will execute DDL statements in other tools
+重要提示：
+- `query_database` 只能执行只读查询
+- 但你可以生成 DDL 语句（如 CREATE INDEX、ALTER TABLE）作为最终答案
+- 用户会在其他工具中执行这些 DDL 语句
 
-When you're ready to provide the final SQL:
-1. Clearly state what the SQL does
-2. Provide the complete SQL statement in a ```sql code block
-3. Format it nicely for readability
+当你准备好提供最终 SQL 时：
+1. 清楚说明 SQL 的作用
+2. 将完整的 SQL 语句放在 ```sql 代码块中
+3. 格式化使其易于阅读
 
-Respond in Chinese when the user uses Chinese."""
+请用中文回复用户的中文请求。"""
 
 
 class AgentService:
-    """Service for running Agent mode queries."""
+    """Service for running Agent mode queries using Anthropic client."""
 
     def __init__(self):
         """Initialize Agent service."""
-        self._active_tasks: dict[str, asyncio.Task[None]] = {}
+        self._client = None
 
     @property
     def is_available(self) -> bool:
         """Check if Agent service is available."""
         return settings.is_agent_configured
 
-    def _create_tools_and_server(self, db_name: str):
-        """Create custom tools and MCP server for the agent."""
-        from claude_agent_sdk import create_sdk_mcp_server, tool
+    def _get_client(self):
+        """Get or create Anthropic async client."""
+        if self._client is None:
+            try:
+                from anthropic import AsyncAnthropic
 
-        @tool("get_table_schema", "获取数据库表结构信息，包括表名、列名、数据类型和注释", {"table_name": str})
-        async def get_schema_tool(args: dict[str, Any]) -> dict[str, Any]:
-            """Get table schema information."""
-            table_name = args.get("table_name")
-            result = await get_table_schema(db_name, table_name)
-            return result
-
-        @tool("query_database", "执行只读SQL查询（仅支持SELECT、DESCRIBE、SHOW、EXPLAIN）", {"sql": str})
-        async def query_db_tool(args: dict[str, Any]) -> dict[str, Any]:
-            """Execute read-only SQL query."""
-            sql = args.get("sql", "")
-            result = await query_database(db_name, sql)
-            return result
-
-        server = create_sdk_mcp_server(
-            name="database",
-            version="1.0.0",
-            tools=[get_schema_tool, query_db_tool]
-        )
-
-        return server
+                self._client = AsyncAnthropic(
+                    api_key=settings.agent_api_key,
+                    base_url=settings.agent_api_base if settings.agent_api_base else None,
+                )
+            except ImportError:
+                logger.error("Anthropic package not installed")
+                return None
+        return self._client
 
     async def run_agent(
         self,
         db_name: str,
         prompt: str,
+        history: list["ConversationTurn"] | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Run Agent to process user prompt and generate SQL.
 
+        Uses Anthropic client with streaming for real-time output.
+
         Args:
             db_name: Database connection name
             prompt: User's natural language request
+            history: Last N rounds of conversation history (user prompts + assistant responses)
 
         Yields:
             SSE events with agent progress and results
@@ -97,7 +93,7 @@ class AgentService:
         tool_calls_count = 0
 
         try:
-            # Emit thinking event
+            # Emit initial thinking event
             yield {
                 "event": "thinking",
                 "data": {"status": "analyzing", "message": "正在分析您的需求..."},
@@ -109,120 +105,208 @@ class AgentService:
                     "event": "error",
                     "data": {
                         "error": "Agent 服务未配置",
-                        "detail": "请设置 AGENT_API_BASE 和 AGENT_API_KEY 环境变量",
+                        "detail": "请设置 AGENT_API_KEY 环境变量",
                     },
                 }
                 return
 
-            # Try to import and use Claude Agent SDK
-            try:
-                from claude_agent_sdk import (
-                    ClaudeAgentOptions,
-                    ClaudeSDKClient,
-                )
-            except ImportError:
-                logger.error("Claude Agent SDK not installed")
+            # Get Anthropic client
+            client = self._get_client()
+            if client is None:
                 yield {
                     "event": "error",
                     "data": {
-                        "error": "Claude Agent SDK 未安装",
-                        "detail": "请运行 'pip install claude-agent-sdk' 安装 Claude Agent SDK",
+                        "error": "Anthropic 客户端未安装",
+                        "detail": "请运行 'pip install anthropic' 安装",
                     },
                 }
                 return
 
-            # Create MCP server with our custom tools
-            server = self._create_tools_and_server(db_name)
+            # Initialize conversation with history
+            messages: list[dict[str, Any]] = []
 
-            # Configure Claude Agent with ONLY our custom tools
-            options = ClaudeAgentOptions(
-                system_prompt=AGENT_SYSTEM_PROMPT,
-                max_turns=settings.agent_max_turns,
-                mcp_servers={"database": server},
-                # Only allow our custom tools, this disables built-in tools like Bash
-                allowed_tools=[
-                    "mcp__database__get_table_schema",
-                    "mcp__database__query_database",
-                ],
-                model=settings.agent_model,
-            )
+            # Add history (last 3 rounds of conversation)
+            if history:
+                for turn in history[-3:]:  # Ensure max 3 rounds
+                    messages.append({"role": "user", "content": turn.user_prompt})
+                    messages.append({"role": "assistant", "content": turn.assistant_response})
+                logger.info(f"Added {len(history[-3:])} turns of conversation history")
 
-            # Run agent with streaming
-            async with ClaudeSDKClient(options=options) as client:
-                await client.query(prompt)
+            # Add current user prompt
+            messages.append({"role": "user", "content": prompt})
+            max_turns = settings.agent_max_turns
 
-                async for message in client.receive_response():
-                    # Handle different message types
-                    msg_type = getattr(message, 'type', None) or type(message).__name__
-                    
-                    if hasattr(message, 'content'):
-                        for block in message.content:
-                            block_type = getattr(block, 'type', None) or type(block).__name__
-                            
-                            if block_type == 'text' or hasattr(block, 'text'):
-                                text = getattr(block, 'text', str(block))
-                                # Check if this contains SQL
-                                sql = self._extract_sql(text)
-                                if sql:
-                                    yield {
-                                        "event": "sql",
-                                        "data": {"sql": sql, "explanation": text},
-                                    }
-                                else:
-                                    yield {
-                                        "event": "message",
-                                        "data": {"role": "assistant", "content": text},
-                                    }
-                            elif block_type == 'tool_use' or hasattr(block, 'name'):
-                                tool_calls_count += 1
-                                tool_id = getattr(block, 'id', f"tc_{tool_calls_count}")
-                                tool_name = getattr(block, 'name', 'unknown')
-                                tool_input = getattr(block, 'input', {})
+            # Agent loop - continue until no more tool calls or max turns reached
+            for turn in range(max_turns):
+                logger.info(f"Agent turn {turn + 1}/{max_turns}")
 
-                                # Emit tool call start
-                                yield {
-                                    "event": "tool_call",
-                                    "data": {
-                                        "id": tool_id,
-                                        "tool": tool_name,
-                                        "input": tool_input,
-                                        "status": "running",
-                                    },
-                                }
-                    
-                    # Handle tool results
-                    if hasattr(message, 'tool_result'):
-                        result = message.tool_result
-                        tool_id = getattr(result, 'tool_use_id', f"tc_{tool_calls_count}")
-                        output_text = ""
-                        is_error = getattr(result, 'is_error', False)
-                        
-                        if hasattr(result, 'content'):
-                            for content_block in result.content:
-                                if hasattr(content_block, 'text'):
-                                    output_text = content_block.text
-                                    break
-                                elif isinstance(content_block, dict) and content_block.get('type') == 'text':
-                                    output_text = content_block.get('text', '')
-                                    break
+                # Call Anthropic API with streaming
+                tool_uses = []
+                current_tool_use = None
 
+                try:
+                    # Use async streaming for real-time output
+                    async with client.messages.stream(
+                        model=settings.agent_model,
+                        max_tokens=4096,
+                        system=AGENT_SYSTEM_PROMPT,
+                        tools=ANTHROPIC_TOOLS,
+                        messages=messages,
+                    ) as stream:
+                        async for event in stream:
+                            # Handle different event types
+                            if event.type == "content_block_start":
+                                if hasattr(event, "content_block"):
+                                    block = event.content_block
+                                    if block.type == "tool_use":
+                                        current_tool_use = {
+                                            "id": block.id,
+                                            "name": block.name,
+                                            "input": {},
+                                        }
+                                        tool_uses.append(current_tool_use)
+                                        # Emit tool call start
+                                        yield {
+                                            "event": "tool_call",
+                                            "data": {
+                                                "id": block.id,
+                                                "tool": block.name,
+                                                "input": {},
+                                                "status": "running",
+                                            },
+                                        }
+
+                            elif event.type == "content_block_delta":
+                                if hasattr(event, "delta"):
+                                    delta = event.delta
+                                    if delta.type == "text_delta":
+                                        # Emit text delta incrementally
+                                        yield {
+                                            "event": "text_delta",
+                                            "data": {"text": delta.text},
+                                        }
+                                    # input_json_delta is handled by stream internally
+
+                            elif event.type == "content_block_stop":
+                                current_tool_use = None
+
+                            # message_stop is handled automatically by stream
+
+                        # Get final message after stream completes
+                        final_message = await stream.get_final_message()
+
+                except Exception as api_error:
+                    logger.exception(f"Anthropic API error: {api_error}")
+                    yield {
+                        "event": "error",
+                        "data": {"error": f"API 错误: {api_error}", "detail": None},
+                    }
+                    return
+
+                # Process the final message
+                assistant_content = []
+                has_tool_use = False
+
+                for block in final_message.content:
+                    if block.type == "text":
+                        assistant_content.append({"type": "text", "text": block.text})
+                        # Check if this contains final SQL
+                        sql = self._extract_sql(block.text)
+                        if sql:
+                            yield {
+                                "event": "sql",
+                                "data": {"sql": sql, "explanation": block.text},
+                            }
+                        else:
+                            yield {
+                                "event": "message",
+                                "data": {"role": "assistant", "content": block.text},
+                            }
+                    elif block.type == "tool_use":
+                        has_tool_use = True
+                        assistant_content.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+
+                # Add assistant message to history
+                messages.append({"role": "assistant", "content": assistant_content})
+
+                # If no tool use, we're done
+                if not has_tool_use:
+                    logger.info("Agent completed - no more tool calls")
+                    break
+
+                # Execute tools and collect results
+                tool_results = []
+                for block in final_message.content:
+                    if block.type == "tool_use":
+                        tool_calls_count += 1
+                        tool_name = block.name
+                        tool_input = block.input
+                        tool_id = block.id
+
+                        logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+
+                        # Update tool call status
                         yield {
                             "event": "tool_call",
                             "data": {
                                 "id": tool_id,
-                                "tool": "tool_result",
-                                "input": {},
-                                "status": "error" if is_error else "completed",
-                                "output": output_text[:1000] if output_text else "",
+                                "tool": tool_name,
+                                "input": tool_input,
+                                "status": "running",
                             },
                         }
+
+                        # Execute tool
+                        tool_start = time.time()
+                        result = await execute_tool(db_name, tool_name, tool_input)
+                        tool_duration = int((time.time() - tool_start) * 1000)
+
+                        logger.info(f"Tool {tool_name} completed in {tool_duration}ms")
+
+                        # Emit tool result
+                        yield {
+                            "event": "tool_call",
+                            "data": {
+                                "id": tool_id,
+                                "tool": tool_name,
+                                "input": tool_input,
+                                "status": "completed",
+                                "output": result[:1000] if len(result) > 1000 else result,
+                                "duration_ms": tool_duration,
+                            },
+                        }
+
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": result,
+                        })
+
+                # Add tool results to conversation
+                messages.append({"role": "user", "content": tool_results})
+
+            else:
+                # Max turns reached
+                logger.warning(f"Agent reached max turns ({max_turns})")
+                yield {
+                    "event": "message",
+                    "data": {
+                        "role": "assistant",
+                        "content": f"已达到最大交互轮次 ({max_turns})，请简化您的请求或重试。",
+                    },
+                }
 
         except asyncio.CancelledError:
             yield {
                 "event": "error",
                 "data": {"error": "任务已取消", "detail": None},
             }
-            return
+            raise
 
         except Exception as e:
             logger.exception(f"Agent error: {e}")
@@ -263,13 +347,11 @@ class AgentService:
 
         return None
 
-    def cancel_task(self, db_name: str) -> bool:
+    def cancel_task(self, _db_name: str) -> bool:
         """Cancel an active agent task for a database."""
-        task = self._active_tasks.get(db_name)
-        if task and not task.done():
-            task.cancel()
-            return True
-        return False
+        # With Anthropic client, cancellation is handled by the SSE connection closing
+        # This method is kept for API compatibility
+        return True
 
 
 # Global instance

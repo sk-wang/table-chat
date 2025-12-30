@@ -37,10 +37,10 @@ class Settings(BaseSettings):
     # MySQL Connection Timeout (seconds)
     mysql_connect_timeout: int = 10
 
-    # Agent Configuration (Claude Agent SDK)
-    agent_api_base: str = ""  # ANTHROPIC_BASE_URL equivalent
-    agent_api_key: str = ""   # ANTHROPIC_AUTH_TOKEN equivalent
-    agent_model: str = "claude-sonnet-4-5"
+    # Agent Configuration (Anthropic Python Client)
+    agent_api_base: str = ""  # Optional: custom base URL (default: api.anthropic.com)
+    agent_api_key: str = ""   # Required: ANTHROPIC_API_KEY
+    agent_model: str = "claude-sonnet-4-5-20250929"
     agent_max_turns: int = 20
     agent_timeout: int = 120  # seconds
 
@@ -61,8 +61,8 @@ class Settings(BaseSettings):
 
     @property
     def is_agent_configured(self) -> bool:
-        """Check if Agent is properly configured."""
-        return bool(self.agent_api_base and self.agent_api_key)
+        """Check if Agent is properly configured (only API key is required)."""
+        return bool(self.agent_api_key)
 
 
 # Global settings instance

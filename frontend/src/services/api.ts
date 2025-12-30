@@ -249,6 +249,9 @@ class ApiClient {
 
         const decoder = new TextDecoder();
         let buffer = '';
+        // Move outside while loop to persist across chunks
+        let currentEvent = '';
+        let currentData = '';
 
         while (true) {
           const { done, value } = await reader.read();
@@ -257,44 +260,55 @@ class ApiClient {
           buffer += decoder.decode(value, { stream: true });
 
           // Process complete SSE events
+          // SSE uses \r\n (CRLF) line endings, so we split on \n and trim \r
           const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-          let currentEvent = '';
-          let currentData = '';
-
-          for (const line of lines) {
+          for (const rawLine of lines) {
+            // Remove trailing \r (from CRLF line endings)
+            const line = rawLine.replace(/\r$/, '');
+            
             if (line.startsWith('event:')) {
               currentEvent = line.slice(6).trim();
             } else if (line.startsWith('data:')) {
               currentData = line.slice(5).trim();
-            } else if (line === '' && currentEvent && currentData) {
-              // End of event, process it
-              try {
-                const data = JSON.parse(currentData);
-                switch (currentEvent) {
-                  case 'thinking':
-                    handlers.onThinking?.(data as ThinkingEventData);
-                    break;
-                  case 'tool_call':
-                    handlers.onToolCall?.(data as ToolCallEventData);
-                    break;
-                  case 'message':
-                    handlers.onMessage?.(data as MessageEventData);
-                    break;
-                  case 'sql':
-                    handlers.onSQL?.(data as SQLEventData);
-                    break;
-                  case 'error':
-                    handlers.onError?.(data as ErrorEventData);
-                    break;
-                  case 'done':
-                    handlers.onDone?.(data as DoneEventData);
-                    break;
+            } else if (line === '') {
+              // Empty line marks end of event
+              if (currentEvent && currentData) {
+                // Process the event
+                try {
+                  const data = JSON.parse(currentData);
+                  console.log('[SSE] Event:', currentEvent, 'Data:', data);
+                  switch (currentEvent) {
+                    case 'thinking':
+                      handlers.onThinking?.(data as ThinkingEventData);
+                      break;
+                    case 'text_delta':
+                      handlers.onTextDelta?.(data as { text: string });
+                      break;
+                    case 'tool_call':
+                      handlers.onToolCall?.(data as ToolCallEventData);
+                      break;
+                    case 'message':
+                      handlers.onMessage?.(data as MessageEventData);
+                      break;
+                    case 'sql':
+                      handlers.onSQL?.(data as SQLEventData);
+                      break;
+                    case 'error':
+                      handlers.onError?.(data as ErrorEventData);
+                      break;
+                    case 'done':
+                      handlers.onDone?.(data as DoneEventData);
+                      break;
+                    default:
+                      console.log('[SSE] Unknown event:', currentEvent);
+                  }
+                } catch (e) {
+                  console.error('Failed to parse SSE data:', e, 'Raw:', currentData);
                 }
-              } catch (e) {
-                console.error('Failed to parse SSE data:', e);
               }
+              // Reset for next event
               currentEvent = '';
               currentData = '';
             }

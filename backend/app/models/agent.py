@@ -8,6 +8,13 @@ from pydantic import BaseModel, Field
 # === Request Models ===
 
 
+class ConversationTurn(BaseModel):
+    """A single conversation turn (user question + assistant response)."""
+
+    user_prompt: str = Field(..., description="User's question/prompt")
+    assistant_response: str = Field(..., description="Assistant's final response")
+
+
 class AgentQueryRequest(BaseModel):
     """Agent query request."""
 
@@ -16,6 +23,11 @@ class AgentQueryRequest(BaseModel):
         min_length=1,
         max_length=4000,
         description="User's natural language request",
+    )
+    history: list[ConversationTurn] = Field(
+        default_factory=list,
+        max_length=3,
+        description="Last 3 rounds of conversation history",
     )
 
 

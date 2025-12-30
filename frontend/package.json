@@ -24,6 +24,8 @@
     "antd": "^5.29.3",
     "autoprefixer": "^10.4.23",
     "axios": "^1.13.2",
+    "highlight.js": "^11.11.1",
+    "marked": "^17.0.1",
     "postcss": "^8.5.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

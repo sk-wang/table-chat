@@ -20,12 +20,13 @@ interface ToolCallBlockProps {
   compact?: boolean;
 }
 
+// JetBrains Darcula style
 const blockStyles: React.CSSProperties = {
   marginTop: 8,
   marginBottom: 8,
-  background: '#1a1a2e',
-  borderRadius: 8,
-  border: '1px solid #2d3748',
+  background: '#3c3f41',
+  borderRadius: 6,
+  border: '1px solid #515151',
   overflow: 'hidden',
 };
 
@@ -39,7 +40,7 @@ const headerStyles: React.CSSProperties = {
 };
 
 const contentStyles: React.CSSProperties = {
-  borderTop: '1px solid #2d3748',
+  borderTop: '1px solid #515151',
   padding: 0,
   overflow: 'hidden',
   transition: 'max-height 0.3s ease-out',
@@ -48,7 +49,7 @@ const contentStyles: React.CSSProperties = {
 const codeBlockStyles: React.CSSProperties = {
   margin: 0,
   padding: 12,
-  background: '#0f172a',
+  background: '#2b2b2b',
   fontSize: 12,
   color: '#a9b7c6',
   overflow: 'auto',
@@ -63,14 +64,15 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
   const [copiedInput, setCopiedInput] = useState(false);
   const [copiedOutput, setCopiedOutput] = useState(false);
 
+  // JetBrains Darcula colors
   const getStatusIcon = () => {
     switch (toolCall.status) {
       case 'running':
-        return <LoadingOutlined style={{ color: '#3b82f6' }} spin />;
+        return <LoadingOutlined style={{ color: '#6897bb' }} spin />; // Blue
       case 'completed':
-        return <CheckCircleOutlined style={{ color: '#22c55e' }} />;
+        return <CheckCircleOutlined style={{ color: '#629755' }} />; // Green
       case 'error':
-        return <CloseCircleOutlined style={{ color: '#ef4444' }} />;
+        return <CloseCircleOutlined style={{ color: '#cc7832' }} />; // Orange
     }
   };
 
@@ -88,11 +90,13 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
   const getToolIcon = () => {
     switch (toolCall.name) {
       case 'query_database':
-        return <DatabaseOutlined style={{ color: '#80CBC4' }} />;
+        return <DatabaseOutlined style={{ color: '#6897bb' }} />; // Blue
       case 'get_table_schema':
-        return <TableOutlined style={{ color: '#FFC66D' }} />;
+        return <TableOutlined style={{ color: '#ffc66d' }} />; // Yellow
+      case 'list_tables':
+        return <TableOutlined style={{ color: '#629755' }} />; // Green
       default:
-        return <ToolOutlined style={{ color: '#9876AA' }} />;
+        return <ToolOutlined style={{ color: '#9876aa' }} />; // Purple
     }
   };
 
@@ -131,19 +135,19 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
       <div
         style={{
           ...headerStyles,
-          background: expanded ? '#1e293b' : 'transparent',
+          background: expanded ? '#45494a' : 'transparent',
         }}
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
-          <DownOutlined style={{ color: '#64748b', fontSize: 12 }} />
+          <DownOutlined style={{ color: '#808080', fontSize: 12 }} />
         ) : (
-          <RightOutlined style={{ color: '#64748b', fontSize: 12 }} />
+          <RightOutlined style={{ color: '#808080', fontSize: 12 }} />
         )}
         
         {getToolIcon()}
         
-        <Text strong style={{ color: '#e2e8f0', flex: 1 }}>
+        <Text strong style={{ color: '#a9b7c6', flex: 1 }}>
           {getToolDisplayName()}
         </Text>
         
@@ -153,7 +157,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
         </Tag>
         
         {toolCall.durationMs !== undefined && toolCall.status !== 'running' && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12, color: '#808080' }}>
             {toolCall.durationMs}ms
           </Text>
         )}
@@ -163,17 +167,17 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
       {expanded && (
         <div style={contentStyles}>
           {/* Input section */}
-          <div style={{ borderBottom: hasOutput ? '1px solid #2d3748' : 'none' }}>
+          <div style={{ borderBottom: hasOutput ? '1px solid #515151' : 'none' }}>
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 padding: '8px 12px',
-                background: '#0f172a',
+                background: '#313335',
               }}
             >
-              <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 11, textTransform: 'uppercase', color: '#808080' }}>
                 输入参数
               </Text>
               <Tooltip title={copiedInput ? '已复制!' : '复制'}>
@@ -185,7 +189,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
                     e.stopPropagation();
                     handleCopy(inputText, 'input');
                   }}
-                  style={{ color: copiedInput ? '#22c55e' : '#64748b' }}
+                  style={{ color: copiedInput ? '#629755' : '#808080' }}
                 />
               </Tooltip>
             </div>
@@ -201,10 +205,10 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '8px 12px',
-                  background: '#0f172a',
+                  background: '#313335',
                 }}
               >
-                <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase' }}>
+                <Text style={{ fontSize: 11, textTransform: 'uppercase', color: '#808080' }}>
                   执行结果
                 </Text>
                 <Tooltip title={copiedOutput ? '已复制!' : '复制'}>
@@ -216,7 +220,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
                       e.stopPropagation();
                       handleCopy(toolCall.output || '', 'output');
                     }}
-                    style={{ color: copiedOutput ? '#22c55e' : '#64748b' }}
+                    style={{ color: copiedOutput ? '#629755' : '#808080' }}
                   />
                 </Tooltip>
               </div>

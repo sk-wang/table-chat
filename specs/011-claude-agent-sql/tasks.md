@@ -1,214 +1,257 @@
-# Tasks: Claude Agent SQL 模式
+# Tasks: Agent 侧边栏重构 (前端 UI 重做)
 
-**Input**: Design documents from `/specs/011-claude-agent-sql/`  
-**Prerequisites**: plan.md ✓, spec.md ✓, research.md ✓, data-model.md ✓, contracts/ ✓
+**Input**: 后端 API 已完成，前端需要重构  
+**Prerequisites**: 后端 Agent API (SSE) ✅ 已就绪
+**需求变更**: 将 Agent 从选项卡模式改为右侧可收起的侧边栏，类似 Cursor
 
-**Tests**: 包含测试任务
-
-**Organization**: 按用户故事组织，每个故事可独立实现和测试
-
-**重要变更**: 不使用 fallback 降级模式，必须配置 Claude Agent SDK 才能使用 Agent 功能
+**Organization**: 按功能模块组织，专注前端重构
 
 ## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: 可并行执行（不同文件，无依赖）
 - **[Story]**: 任务所属用户故事 (US1, US2, US3)
-- 包含精确文件路径
 
 ---
 
-## Phase 1: Setup (项目初始化)
+## Phase 1: 清理旧代码
 
-**Purpose**: 添加依赖、配置环境
+**Purpose**: 移除旧的 Agent 选项卡实现
 
-- [x] T001 添加 `claude-agent-sdk` 依赖到 `backend/pyproject.toml`
-- [x] T002 [P] 添加 Agent 环境变量配置到 `backend/.env.example`
-- [x] T003 [P] 创建 Agent 组件目录结构 `frontend/src/components/agent/`
+- [X] T001 移除 `frontend/src/pages/query/index.tsx` 中 Agent 选项卡相关代码
+- [X] T002 [P] 清理 `frontend/src/components/agent/AgentChat.tsx` 中的调试日志
 
----
-
-## Phase 2: Foundational (基础设施)
-
-**Purpose**: 所有用户故事都依赖的核心基础设施
-
-**⚠️ CRITICAL**: 必须完成本阶段后才能开始用户故事实现
-
-### 后端基础
-
-- [x] T004 添加 Agent 配置项到 `backend/app/config.py`（agent_api_base, agent_api_key, agent_model 等）
-- [x] T005 [P] 创建 Agent 请求/响应模型到 `backend/app/models/agent.py`（AgentQueryRequest, AgentEvent 等）
-- [x] T006 [P] 实现只读 SQL 验证函数 `validate_readonly()` 到 `backend/app/services/query_service.py`（扩展支持 DESCRIBE/SHOW/EXPLAIN）
-- [x] T007 实现 MCP 工具定义到 `backend/app/services/agent_tools.py`（query_database, get_table_schema 两个工具）
-- [x] T008 实现 Agent 服务核心到 `backend/app/services/agent_service.py`（AgentService 类，仅使用 ClaudeSDKClient，无 fallback）
-
-### 前端基础
-
-- [x] T009 [P] 创建 Agent 类型定义到 `frontend/src/types/agent.ts`（AgentMessage, ToolCallInfo, AgentState 等）
-- [x] T010 [P] 添加 SSE 客户端函数到 `frontend/src/services/api.ts`（agentQuery, cancelAgentQuery）
-
-**Checkpoint**: 基础设施就绪 - 可以开始用户故事实现
+**Checkpoint**: 查询页面回归到只有 SQL/自然语言两个选项卡
 
 ---
 
-## Phase 3: User Story 1 - 切换到 Agent 模式生成 SQL (Priority: P1) 🎯 MVP
+## Phase 2: 侧边栏布局 (Priority: P1) 🎯 MVP
 
-**Goal**: 用户可以在 Agent 选项卡中输入自然语言请求，Agent 探索数据库并生成 SQL
+**Goal**: 创建右侧可收起的 Agent 侧边栏
 
-**Independent Test**: 切换到 Agent 模式，输入请求，观察生成的 SQL 填充到编辑器
+**Independent Test**: 点击侧边栏按钮可以展开/收起 Agent 面板
 
-### 后端实现
+### 布局组件
 
-- [x] T011 [US1] 实现 `/agent/query` SSE 端点到 `backend/app/api/v1/agent.py`（POST，返回 StreamingResponse）
-- [x] T012 [US1] 实现 `/agent/status` 端点到 `backend/app/api/v1/agent.py`（GET，返回 Agent 配置状态）
-- [x] T013 [US1] 注册 Agent 路由到 `backend/app/api/v1/__init__.py`
+- [X] T003 [US1] 创建 `frontend/src/components/agent/AgentSidebar.tsx`：
+  - 可收起/展开的侧边栏容器
+  - 默认收起状态，显示一个 AI 图标按钮
+  - 展开时宽度约 400px，可拖拽调整
+  - 使用 Ant Design Drawer 或自定义实现
 
-### 前端实现
+- [X] T004 [US1] 更新 `frontend/src/pages/query/index.tsx`：
+  - 在最外层 Layout 添加右侧 Agent 侧边栏
+  - 侧边栏不影响原有的 SQL 编辑器和结果区域
+  - 添加全局状态控制侧边栏展开/收起
 
-- [x] T014 [P] [US1] 创建 AgentChat 主组件到 `frontend/src/components/agent/AgentChat.tsx`（输入框 + 消息列表 + 状态管理）
-- [x] T015 [P] [US1] 创建 AgentMessage 组件到 `frontend/src/components/agent/AgentMessage.tsx`（用户/助手消息渲染）
-- [x] T016 [US1] 创建 Agent 组件导出索引到 `frontend/src/components/agent/index.ts`
-- [x] T017 [US1] 更新 QueryPage 添加 Agent 选项卡到 `frontend/src/pages/query/index.tsx`（与"自然语言"同级）
-- [x] T018 [US1] 实现 Agent 生成 SQL 填充到编辑器功能（在 AgentChat 中添加"复制到编辑器"回调）
-
-### 测试
-
-- [x] T019 [P] [US1] Agent API 端点测试到 `backend/tests/test_api/test_agent.py` ✅ 7 tests
-- [x] T020 [P] [US1] Agent 工具安全验证测试到 `backend/tests/test_services/test_agent_tools.py` ✅ 20 tests
-
-**Checkpoint**: 用户可以使用 Agent 模式生成 SQL 并填充到编辑器
+**Checkpoint**: 可以点击按钮展开/收起右侧 Agent 面板
 
 ---
 
-## Phase 4: User Story 2 - 查看代理探索过程 (Priority: P2)
+## Phase 3: Agent 交互重构 (Priority: P1)
 
-**Goal**: 用户可以实时看到 Agent 的思考过程、工具调用详情
+**Goal**: 重写 Agent 聊天组件，确保 SSE 事件正确处理
 
-**Independent Test**: 发起 Agent 请求，观察工具调用块可展开/折叠，显示输入/输出
+### 核心组件重写
 
-### 前端实现
+- [X] T005 [US1] 重写 `frontend/src/components/agent/AgentChat.tsx`：
+  - 简化状态管理，使用 useReducer 替代多个 useState
+  - 修复 SSE 事件处理，确保实时显示
+  - 添加消息列表渲染
+  - 添加输入框和发送按钮
 
-- [x] T021 [P] [US2] 创建 ThinkingIndicator 组件到 `frontend/src/components/agent/ThinkingIndicator.tsx`（动态状态指示器：思考中/执行工具中/生成中）
-- [x] T022 [P] [US2] 创建 ToolCallBlock 组件到 `frontend/src/components/agent/ToolCallBlock.tsx`（可折叠工具调用块，显示工具名/参数/结果/耗时）
-- [x] T023 [US2] 增强 AgentMessage 组件支持 toolCall 渲染到 `frontend/src/components/agent/AgentMessage.tsx`
-- [x] T024 [US2] 更新 AgentChat 处理 tool_call 和 tool_result 事件到 `frontend/src/components/agent/AgentChat.tsx`
-- [x] T025 [US2] 添加工具调用历史展示到 AgentChat（消息列表中插入工具调用块）
+- [X] T006 [P] [US2] 重写 `frontend/src/components/agent/AgentMessage.tsx`：
+  - 用户消息样式（右对齐，蓝色背景）
+  - 助手消息样式（左对齐，灰色背景）
+  - 支持 Markdown 渲染
 
-### 样式优化
+- [X] T007 [P] [US2] 重写 `frontend/src/components/agent/ToolCallBlock.tsx`：
+  - 可折叠的工具调用卡片
+  - 显示工具名、输入参数、输出结果
+  - 显示执行状态和耗时
 
-- [x] T026 [P] [US2] 添加 Agent 组件样式（思考动画、工具块折叠动画）到 `frontend/src/components/agent/` 内联样式或 CSS 模块
+- [X] T008 [P] [US2] 更新 `frontend/src/components/agent/ThinkingIndicator.tsx`：
+  - 简化动画效果
+  - 显示当前状态文字
 
-**Checkpoint**: 用户可以清晰看到 Agent 的完整探索过程
-
----
-
-## Phase 5: User Story 3 - 在两种模式间自由切换 (Priority: P3)
-
-**Goal**: 用户可以在"自然语言"和"Agent"选项卡间自由切换，SQL 编辑器内容保持不变
-
-**Independent Test**: 在 Agent 模式生成 SQL → 切换到自然语言 → SQL 保留 → 切换回 Agent → 编辑器内容不变
-
-### 前端实现
-
-- [x] T027 [US3] 实现选项卡切换状态管理到 `frontend/src/pages/query/index.tsx`（扩展 QueryMode 类型为 'sql' | 'natural' | 'agent'）
-- [x] T028 [US3] 确保 SQL 编辑器内容在模式切换时保持不变（验证 sqlQuery 状态不受选项卡切换影响）
-- [x] T029 [US3] 添加 Agent 服务可用性检查到 QueryPage（如果未配置则禁用 Agent 选项卡）
-
-### 错误处理
-
-- [x] T030 [US3] 实现 Agent 任务取消功能到 `backend/app/api/v1/agent.py`（POST /agent/cancel 端点）
-- [x] T031 [US3] 添加取消按钮到 AgentChat 组件（调用 cancelAgentQuery API）
-- [x] T032 [US3] 实现超时处理和错误提示到 AgentChat（网络断开、Agent 超时等边缘情况）
-
-**Checkpoint**: 用户可以在三种模式间自由切换，体验流畅
+**Checkpoint**: Agent 对话可以正常显示消息和工具调用
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 4: SSE 事件处理修复 (Priority: P1)
 
-**Purpose**: 跨故事的优化和完善
+**Goal**: 确保 SSE 事件正确解析和显示
 
-### 文档
+- [X] T009 [US1] 重构 `frontend/src/services/api.ts` agentQuery 方法：
+  - 使用原生 EventSource API 替代手动解析
+  - 或者修复当前的 SSE 解析逻辑
+  - 添加详细错误处理
 
-- [x] T033 [P] 更新 quickstart.md 验证所有使用场景 (已在 plan 阶段完成)
-- [x] T034 [P] 更新 README.md 添加 Agent 模式说明
+- [X] T010 [US1] 创建 `frontend/src/hooks/useAgentChat.ts`：
+  - 封装 Agent 聊天状态管理
+  - 封装 SSE 连接和事件处理
+  - 提供 sendMessage, cancel 等方法
 
-### 代码质量
-
-- [x] T035 [P] Agent 服务单元测试到 `backend/tests/test_services/test_agent_service.py` ✅ 12 tests
-- [x] T036 [P] Agent 组件单元测试到 `frontend/src/test/agent.test.ts` ✅ 17 tests
-- [x] T037 代码审查和重构（消除重复代码，优化错误处理）
-
-### 性能优化
-
-- [x] T038 优化 SSE 连接管理（添加超时机制）
-- [x] T039 优化工具输出截断逻辑（大结果集处理）- 已在 agent_tools.py 实现
+**Checkpoint**: 发送消息后可以实时看到流式响应
 
 ---
 
-## Phase 7: 移除 Fallback 逻辑 (重构)
+## Phase 5: 交互细节 (Priority: P2)
 
-**Purpose**: 移除 fallback 降级模式，仅使用 Claude Agent SDK
+**Goal**: 完善用户交互体验
 
-- [x] T040 移除 `_run_fallback_agent` 方法到 `backend/app/services/agent_service.py`
-- [x] T041 更新 `run_agent` 方法，当 SDK 未安装时返回错误到 `backend/app/services/agent_service.py`
-- [x] T042 更新 Agent 服务测试，验证无 fallback 行为到 `backend/tests/test_services/test_agent_service.py`
-- [x] T043 更新前端 AgentChat 组件，显示 "需要安装 Claude Agent SDK" 提示到 `frontend/src/components/agent/AgentChat.tsx`
-- [x] T044 更新 API 端点测试，验证 SDK 未安装场景到 `backend/tests/test_api/test_agent.py`
+- [X] T011 [US3] 实现 SQL 复制到编辑器功能：
+  - Agent 生成 SQL 后显示"复制到编辑器"按钮
+  - 点击后将 SQL 填充到主编辑器
 
-**Checkpoint**: ✅ Agent 模式仅使用 Claude Agent SDK，无降级逻辑
+- [X] T012 [P] [US2] 添加消息自动滚动：
+  - 新消息时自动滚动到底部
+  - 用户手动滚动时暂停自动滚动
+
+- [X] T013 [P] [US1] 添加取消请求功能：
+  - 显示取消按钮
+  - 点击后中断 SSE 连接
+
+**Checkpoint**: 用户体验流畅，功能完整
+
+---
+
+## Phase 6: 样式美化 (Priority: P3)
+
+**Goal**: 统一样式，提升视觉效果
+
+- [X] T014 [P] 创建 `frontend/src/components/agent/styles.css`：
+  - 侧边栏深色主题样式
+  - 消息气泡样式
+  - 工具调用卡片样式
+  - 动画过渡效果
+
+- [X] T015 [P] 添加响应式布局支持：
+  - 小屏幕下侧边栏全屏覆盖
+  - 触摸友好的交互
+
+**Checkpoint**: 视觉效果符合现代设计标准
+
+---
+
+## Phase 7: Markdown 渲染支持 (Priority: P2)
+
+**Goal**: 支持 Agent 消息的 Markdown 格式渲染，包括代码高亮
+
+**需求**: 使用 `marked` 库解析 Markdown，支持：
+- 标题、加粗、斜体等基本格式
+- 代码块语法高亮 (SQL、JavaScript 等)
+- 行内代码样式
+- 列表、引用等
+
+### 任务
+
+- [X] T016 安装 `marked` 依赖：
+  ```bash
+  cd frontend && npm install marked
+  ```
+
+- [X] T017 [P] 创建 `frontend/src/components/agent/MarkdownRenderer.tsx`：
+  - 使用 marked 解析 Markdown
+  - 自定义代码块渲染器（深色主题样式）
+  - 处理 XSS 安全（sanitize HTML）
+  - 支持 SQL 代码块特殊样式
+
+- [X] T018 [P] 更新 `frontend/src/components/agent/AgentMessage.tsx`：
+  - 使用 MarkdownRenderer 渲染 assistant 消息
+  - 保持 user 消息为纯文本
+
+- [X] T019 更新 `frontend/src/components/agent/styles.css`：
+  - 添加 Markdown 元素样式（h1-h6, code, pre, blockquote 等）
+  - 代码块深色主题样式
+  - 行内代码样式
+
+**Checkpoint**: Agent 回复的 Markdown 内容正确渲染，代码块有语法高亮
 
 ---
 
 ## Dependencies & Execution Order
 
-### Phase Dependencies
-
 ```
-Phase 1: Setup ──────────────────────────┐
-                                         ↓
-Phase 2: Foundational ───────────────────┤ (BLOCKS all user stories)
-                                         ↓
-         ┌───────────────────────────────┼───────────────────────────────┐
-         ↓                               ↓                               ↓
-Phase 3: US1 (P1)              Phase 4: US2 (P2)              Phase 5: US3 (P3)
-(Core Agent Mode)              (Exploration Visibility)       (Mode Switching)
-         ↓                               ↓                               ↓
-         └───────────────────────────────┴───────────────────────────────┘
-                                         ↓
-                              Phase 6: Polish
-                                         ↓
-                              Phase 7: 移除 Fallback
+Phase 1: 清理旧代码 ─────────────────────────┐
+                                             ↓
+Phase 2: 侧边栏布局 (MVP) ───────────────────┤
+                                             ↓
+         ┌───────────────────────────────────┤
+         ↓                                   ↓
+Phase 3: Agent 交互重构          Phase 4: SSE 修复
+         ↓                                   ↓
+         └───────────────────────────────────┤
+                                             ↓
+Phase 5: 交互细节 ───────────────────────────┤
+                                             ↓
+Phase 6: 样式美化
 ```
 
-### User Story Dependencies
+### Task Dependencies
 
-| Story | 依赖 | 可独立测试 |
-|-------|------|------------|
-| **US1** | Phase 2 完成 | ✅ 可以单独使用 Agent 生成 SQL |
-| **US2** | US1 基础组件存在 | ✅ 可以单独测试工具调用展示 |
-| **US3** | US1 Agent 选项卡存在 | ✅ 可以单独测试模式切换 |
-
-### Task Dependencies within Phases
-
-**Phase 2 (Foundational)**:
+**Phase 2 (布局)**:
 ```
-T004 (config) ──┐
-T005 (models) ──┼──→ T007 (tools) ──→ T008 (service)
-T006 (validate) ┘
+T003 (侧边栏组件) → T004 (集成到页面)
 ```
 
-**Phase 3 (US1)**:
+**Phase 3-4 (核心功能)**:
 ```
-T011/T012/T013 (API) ──┐
-                       ├──→ T017 (integrate to page) ──→ T018 (copy to editor)
-T014/T015/T016 (components) ┘
+T009 (SSE修复) ──→ T010 (Hook封装) ──→ T005 (Chat组件)
+T006, T007, T008 可并行
 ```
 
-**Phase 7 (移除 Fallback)**:
+---
+
+## Implementation Strategy
+
+### MVP First (Phase 1-4)
+
+1. 完成 Phase 1: 清理旧代码
+2. 完成 Phase 2: 创建侧边栏布局
+3. 完成 Phase 3-4: 重写核心组件和 SSE 处理
+4. **验证**: 可以正常展开侧边栏、发送消息、看到实时响应
+
+### 关键技术决策
+
+**1. SSE 处理方案**:
+使用 EventSource API 或 fetch + ReadableStream，确保：
+- 事件实时触发 React 状态更新
+- 正确处理多行数据
+- 优雅处理连接断开
+
+**2. 状态管理**:
+```typescript
+// useReducer 管理复杂状态
+type AgentState = {
+  status: 'idle' | 'connecting' | 'streaming' | 'done' | 'error';
+  messages: AgentMessage[];
+  streamingText: string;
+  error: string | null;
+};
+
+type AgentAction = 
+  | { type: 'START' }
+  | { type: 'TEXT_DELTA'; text: string }
+  | { type: 'TOOL_CALL'; data: ToolCallData }
+  | { type: 'MESSAGE'; data: MessageData }
+  | { type: 'DONE' }
+  | { type: 'ERROR'; error: string }
+  | { type: 'RESET' };
 ```
-T040 (移除方法) ──→ T041 (更新逻辑) ──→ T042/T044 (更新测试)
-                                        ↓
-                                    T043 (前端提示)
+
+**3. 侧边栏布局**:
+```tsx
+<Layout style={{ height: '100%' }}>
+  <Content>
+    {/* 原有的 SQL 编辑器和结果区域 */}
+  </Content>
+  <AgentSidebar 
+    collapsed={!agentOpen} 
+    onCollapse={() => setAgentOpen(false)}
+    dbName={selectedDatabase?.name}
+    onSQLGenerated={handleSQLGenerated}
+  />
+</Layout>
 ```
 
 ---
@@ -217,22 +260,21 @@ T040 (移除方法) ──→ T041 (更新逻辑) ──→ T042/T044 (更新测
 
 | 指标 | 值 |
 |------|-----|
-| **总任务数** | 44 |
-| **Phase 1 (Setup)** | 3 ✅ |
-| **Phase 2 (Foundational)** | 7 ✅ |
-| **Phase 3 (US1 - MVP)** | 10 ✅ |
-| **Phase 4 (US2)** | 6 ✅ |
-| **Phase 5 (US3)** | 6 ✅ |
-| **Phase 6 (Polish)** | 7 ✅ |
-| **Phase 7 (移除 Fallback)** | 5 ✅ |
-| **所有任务已完成** | ✅ |
+| **总任务数** | 19 |
+| **Phase 1 (清理)** | 2 ✅ |
+| **Phase 2 (布局 - MVP)** | 2 ✅ |
+| **Phase 3 (交互重构)** | 4 ✅ |
+| **Phase 4 (SSE修复)** | 2 ✅ |
+| **Phase 5 (交互细节)** | 3 ✅ |
+| **Phase 6 (样式)** | 2 ✅ |
+| **Phase 7 (Markdown)** | 4 ✅ |
+| **并行任务数** | 10 |
 
 ---
 
 ## Notes
 
-- 不使用 fallback 降级模式
-- 必须安装并配置 Claude Agent SDK 才能使用 Agent 功能
-- 未配置时前端显示明确的错误提示
-- [P] 任务 = 不同文件，无依赖
-- [Story] 标签映射到 spec.md 中的用户故事
+- 后端 API 已完成，本任务只涉及前端重构
+- 重点解决 SSE 事件处理问题
+- 侧边栏设计参考 Cursor 的 AI 面板
+- 保持与现有深色主题一致

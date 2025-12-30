@@ -1,4 +1,4 @@
-"""Agent API endpoints for SQL generation with Claude Agent SDK."""
+"""Agent API endpoints for SQL generation with Anthropic Tool Use."""
 
 import json
 import logging
@@ -79,39 +79,43 @@ async def agent_query(name: str, request: AgentQueryRequest) -> StreamingRespons
 
     # Check if agent is available
     if not agent_service.is_available:
-        # Try fallback mode (using existing LLM service)
-        from app.services.llm_service import llm_service
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent service is not configured. Please set AGENT_API_KEY environment variable.",
+        )
 
-        if not llm_service.is_available:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Agent service is not configured. Please set AGENT_API_BASE and AGENT_API_KEY, or LLM_API_KEY for fallback mode.",
-            )
+    from sse_starlette.sse import EventSourceResponse, ServerSentEvent
 
     async def event_generator():
         """Generate SSE events from agent."""
         try:
-            async for event in agent_service.run_agent(name, request.prompt):
+            # Send initial connection event immediately
+            yield ServerSentEvent(event="connected", data="{}")
+
+            async for event in agent_service.run_agent(name, request.prompt, request.history):
                 event_type = event.get("event", "message")
                 event_data = event.get("data", {})
 
-                # Format as SSE
-                yield f"event: {event_type}\n"
-                yield f"data: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+                logger.debug(f"SSE sending: {event_type}")
+                yield ServerSentEvent(
+                    event=event_type,
+                    data=json.dumps(event_data, ensure_ascii=False),
+                )
 
         except Exception as e:
             logger.exception(f"Agent stream error: {e}")
             error_event = {"error": str(e), "detail": None}
-            yield f"event: error\n"
-            yield f"data: {json.dumps(error_event, ensure_ascii=False)}\n\n"
+            yield ServerSentEvent(
+                event="error",
+                data=json.dumps(error_event, ensure_ascii=False),
+            )
 
-    return StreamingResponse(
+    return EventSourceResponse(
         event_generator(),
-        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "X-Accel-Buffering": "no",
         },
     )
 

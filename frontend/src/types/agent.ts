@@ -23,12 +23,17 @@ export interface ToolCallInfo {
 
 export type AgentEventType =
   | 'thinking'
+  | 'text_delta'
   | 'tool_call'
   | 'tool_result'
   | 'message'
   | 'sql'
   | 'error'
   | 'done';
+
+export interface TextDeltaEventData {
+  text: string;
+}
 
 export interface ThinkingEventData {
   status: 'analyzing' | 'planning' | 'generating';
@@ -86,8 +91,14 @@ export interface AgentState {
 
 // === API Types ===
 
+export interface ConversationTurn {
+  user_prompt: string;
+  assistant_response: string;
+}
+
 export interface AgentQueryRequest {
   prompt: string;
+  history?: ConversationTurn[];
 }
 
 export interface AgentStatusResponse {
@@ -100,6 +111,7 @@ export interface AgentStatusResponse {
 
 export interface AgentEventHandlers {
   onThinking?: (data: ThinkingEventData) => void;
+  onTextDelta?: (data: TextDeltaEventData) => void;
   onToolCall?: (data: ToolCallEventData) => void;
   onMessage?: (data: MessageEventData) => void;
   onSQL?: (data: SQLEventData) => void;

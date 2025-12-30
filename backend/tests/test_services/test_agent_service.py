@@ -1,6 +1,6 @@
-"""Unit tests for Agent service."""
+"""Unit tests for Agent service using Anthropic Python client."""
 
-from unittest.mock import AsyncMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
 
@@ -86,100 +86,92 @@ GROUP BY u.id, u.name
 class TestAgentServiceCancellation:
     """Test suite for Agent task cancellation."""
 
-    def test_cancel_task_no_active(self):
-        """Test cancelling when no active task."""
+    def test_cancel_task_returns_true(self):
+        """Test cancelling task returns True (handled by SSE connection)."""
         service = AgentService()
         result = service.cancel_task("testdb")
-        assert result is False
-
-    def test_cancel_task_dict_empty(self):
-        """Test active tasks dict starts empty."""
-        service = AgentService()
-        assert len(service._active_tasks) == 0
+        assert result is True
 
 
 @pytest.mark.asyncio
 class TestAgentServiceRunAgent:
     """Test suite for Agent service run_agent method."""
 
-    async def test_run_agent_emits_events(self):
-        """Test run_agent emits events."""
+    async def test_run_agent_not_configured_emits_error(self):
+        """Test run_agent emits error when not configured."""
         service = AgentService()
         
-        events = []
-        async for event in service.run_agent("testdb", "test query"):
-            events.append(event)
+        with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
+            mock_available.return_value = False
+            
+            events = []
+            async for event in service.run_agent("testdb", "test query"):
+                events.append(event)
+            
+            # Should have error event
+            error_events = [e for e in events if e.get("event") == "error"]
+            assert len(error_events) >= 1
+            
+            error_data = error_events[0]["data"]
+            assert "未配置" in error_data.get("error", "")
+
+    async def test_run_agent_anthropic_not_installed_emits_error(self):
+        """Test run_agent emits error when Anthropic client is not installed."""
+        service = AgentService()
         
-        # Should have at least thinking and done events
-        event_types = [e.get("event") for e in events]
-        assert len(events) >= 1
-        # Done event should always be present
-        assert "done" in event_types
+        with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
+            mock_available.return_value = True
+            
+            # Mock _get_client to return None
+            with patch.object(service, '_get_client', return_value=None):
+                events = []
+                async for event in service.run_agent("testdb", "test query"):
+                    events.append(event)
+                
+                # Should have error event about client not installed
+                error_events = [e for e in events if e.get("event") == "error"]
+                assert len(error_events) >= 1
+                
+                error_data = error_events[0]["data"]
+                assert "未安装" in error_data.get("error", "")
 
     async def test_run_agent_done_event_structure(self):
         """Test run_agent done event has correct structure."""
         service = AgentService()
         
-        events = []
-        async for event in service.run_agent("testdb", "test"):
-            events.append(event)
-        
-        # Find done event
-        done_events = [e for e in events if e.get("event") == "done"]
-        assert len(done_events) == 1
-        
-        done_data = done_events[0]["data"]
-        assert "total_time_ms" in done_data
-        assert "tool_calls_count" in done_data
-        assert isinstance(done_data["total_time_ms"], int)
-        assert isinstance(done_data["tool_calls_count"], int)
+        with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
+            mock_available.return_value = False
+            
+            events = []
+            async for event in service.run_agent("testdb", "test"):
+                events.append(event)
+            
+            # Find done event
+            done_events = [e for e in events if e.get("event") == "done"]
+            assert len(done_events) == 1
+            
+            done_data = done_events[0]["data"]
+            assert "total_time_ms" in done_data
+            assert "tool_calls_count" in done_data
+            assert isinstance(done_data["total_time_ms"], int)
+            assert isinstance(done_data["tool_calls_count"], int)
 
-    async def test_run_agent_sdk_not_installed_returns_error(self):
-        """Test run_agent returns error when Claude Agent SDK is not installed."""
-        import sys
-        
+    async def test_run_agent_thinking_event_first(self):
+        """Test run_agent emits thinking event first."""
         service = AgentService()
         
-        # Mock SDK import to fail
-        with patch.dict(sys.modules, {'claude_agent_sdk': None}):
-            # Also mock is_available to return True (config is set)
-            with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
-                mock_available.return_value = True
-                
-                events = []
-                async for event in service.run_agent("testdb", "test query"):
-                    events.append(event)
-                
-                # Should have an error event about SDK not installed
-                error_events = [e for e in events if e.get("event") == "error"]
-                assert len(error_events) >= 1
-                
-                error_data = error_events[0]["data"]
-                assert "Claude Agent SDK" in error_data.get("error", "")
-                assert "pip install" in error_data.get("detail", "")
-
-    async def test_run_agent_no_fallback_when_sdk_unavailable(self):
-        """Test run_agent does NOT fallback when Claude Agent SDK is not installed."""
-        import sys
-        
-        service = AgentService()
-        
-        # Mock SDK import to fail
-        with patch.dict(sys.modules, {'claude_agent_sdk': None}):
-            with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
-                mock_available.return_value = True
-                
-                events = []
-                async for event in service.run_agent("testdb", "test query"):
-                    events.append(event)
-                
-                # Should NOT have any tool_call events (fallback would have these)
-                tool_call_events = [e for e in events if e.get("event") == "tool_call"]
-                assert len(tool_call_events) == 0
-                
-                # Should NOT have any sql events (fallback would have these)
-                sql_events = [e for e in events if e.get("event") == "sql"]
-                assert len(sql_events) == 0
+        with patch.object(AgentService, 'is_available', new_callable=PropertyMock) as mock_available:
+            mock_available.return_value = False
+            
+            events = []
+            async for event in service.run_agent("testdb", "test"):
+                events.append(event)
+            
+            # First event should be thinking
+            assert events[0].get("event") == "thinking"
+            thinking_data = events[0]["data"]
+            assert "status" in thinking_data
+            assert "message" in thinking_data
 
 
 class TestAgentServiceGlobalInstance:
@@ -196,4 +188,4 @@ class TestAgentServiceGlobalInstance:
         assert hasattr(agent_service, "cancel_task")
         assert hasattr(agent_service, "is_available")
         assert hasattr(agent_service, "_extract_sql")
-
+        assert hasattr(agent_service, "_get_client")

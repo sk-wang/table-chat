@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography } from 'antd';
 import { UserOutlined, RobotOutlined, ToolOutlined } from '@ant-design/icons';
 import { ToolCallBlock } from './ToolCallBlock';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import type { AgentMessage as AgentMessageType } from '../../types/agent';
 
 const { Text, Paragraph } = Typography;
@@ -14,25 +15,26 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const isTool = message.role === 'tool';
 
+  // JetBrains Darcula color scheme
   const getIcon = () => {
     switch (message.role) {
       case 'user':
-        return <UserOutlined style={{ color: '#80CBC4' }} />;
+        return <UserOutlined style={{ color: '#6897bb' }} />; // Blue
       case 'assistant':
-        return <RobotOutlined style={{ color: '#FFC66D' }} />;
+        return <RobotOutlined style={{ color: '#ffc66d' }} />; // Yellow
       case 'tool':
-        return <ToolOutlined style={{ color: '#9876AA' }} />;
+        return <ToolOutlined style={{ color: '#9876aa' }} />; // Purple
     }
   };
 
   const getBackground = () => {
     switch (message.role) {
       case 'user':
-        return '#2d3748';
+        return '#313335'; // JetBrains dark gray
       case 'assistant':
-        return '#1e293b';
+        return '#2b2b2b'; // JetBrains editor background
       case 'tool':
-        return '#1a1a2e';
+        return '#3c3f41'; // JetBrains tool panel
     }
   };
 
@@ -78,17 +80,23 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({ message }) => {
             borderTopRightRadius: isUser ? 4 : 12,
           }}
         >
-          {!isTool && (
-            <Paragraph
-              style={{
-                margin: 0,
-                color: '#e0e0e0',
-                fontSize: 14,
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              {message.content}
-            </Paragraph>
+          {!isTool && message.content && (
+            isUser ? (
+              // User messages: plain text
+              <Paragraph
+                style={{
+                  margin: 0,
+                  color: '#e0e0e0',
+                  fontSize: 14,
+                  whiteSpace: 'pre-wrap',
+                }}
+              >
+                {message.content}
+              </Paragraph>
+            ) : (
+              // Assistant messages: Markdown rendered
+              <MarkdownRenderer content={message.content} />
+            )
           )}
           
           {message.toolCall && (

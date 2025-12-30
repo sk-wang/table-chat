@@ -31,14 +31,14 @@
 - **智能导出识别**：识别"导出为 CSV"等意图自动触发导出
 
 ### ⚡ Agent 模式（新功能）
-- **智能代理探索**：Agent 自动探索数据库结构，理解表关系
-- **工具调用可视化**：实时显示 Agent 的思考过程和工具执行详情
+- **智能代理探索**：基于 Anthropic Claude 的 Agent 自动探索数据库结构，理解表关系
+- **实时流式输出**：实时显示 Agent 的思考过程和工具执行详情
   - 可折叠展开的工具调用块
   - 显示输入参数、执行结果和耗时
+  - 流式文本增量显示，体验流畅
 - **灵活的 SQL 生成**：不仅限于 SELECT，还支持生成 DDL 语句（CREATE INDEX、ALTER TABLE 等）
 - **一键复制到编辑器**：生成的 SQL 可直接填充到 SQL 编辑器
 - **三模式切换**：SQL 编辑器、自然语言、Agent 模式自由切换，编辑器内容保持不变
-- **降级支持**：未配置 Claude SDK 时，自动使用现有 LLM 服务
 
 ### 📊 结果展示与导出
 - 表格形式展示查询结果
@@ -322,9 +322,9 @@ npm run test:e2e:ui
 
 | 变量名 | 描述 | 默认值 |
 |--------|------|--------|
-| `AGENT_API_BASE` | Claude Agent API 地址 | - |
-| `AGENT_API_KEY` | Claude Agent 认证 Token | - |
-| `AGENT_MODEL` | Agent 使用的模型 | `claude-sonnet-4-5` |
+| `AGENT_API_KEY` | Anthropic API Key（必填） | - |
+| `AGENT_API_BASE` | Anthropic API 地址（可选，用于自定义端点） | api.anthropic.com |
+| `AGENT_MODEL` | Agent 使用的模型 | `claude-sonnet-4-5-20250929` |
 | `AGENT_MAX_TURNS` | Agent 最大对话轮数 | `20` |
 | `AGENT_TIMEOUT` | Agent 请求超时时间（秒） | `120` |
 
