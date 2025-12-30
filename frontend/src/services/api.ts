@@ -15,6 +15,17 @@ import type {
   QueryHistorySearchResponse,
 } from '../types/history';
 import type { DatabaseMetadata, TableListResponse, TableMetadata } from '../types/metadata';
+import type {
+  AgentEventHandlers,
+  AgentQueryRequest,
+  AgentStatusResponse,
+  ThinkingEventData,
+  ToolCallEventData,
+  MessageEventData,
+  SQLEventData,
+  ErrorEventData,
+  DoneEventData,
+} from '../types/agent';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888';
 
@@ -182,6 +193,131 @@ class ApiClient {
         `/dbs/${dbName}/history/search`,
         { params: { query, limit } }
       );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  // === Agent Operations ===
+
+  async getAgentStatus(): Promise<AgentStatusResponse> {
+    try {
+      const response: AxiosResponse<AgentStatusResponse> = await this.client.get('/agent/status');
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  /**
+   * Start an agent query with SSE streaming.
+   * Returns an AbortController that can be used to cancel the request.
+   */
+  agentQuery(
+    dbName: string,
+    request: AgentQueryRequest,
+    handlers: AgentEventHandlers
+  ): AbortController {
+    const controller = new AbortController();
+
+    const processStream = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/v1/dbs/${dbName}/agent/query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
+          handlers.onError?.({
+            error: errorData.error || `HTTP ${response.status}`,
+            detail: errorData.detail,
+          });
+          return;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) {
+          handlers.onError?.({ error: 'No response body' });
+          return;
+        }
+
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete SSE events
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+          let currentEvent = '';
+          let currentData = '';
+
+          for (const line of lines) {
+            if (line.startsWith('event:')) {
+              currentEvent = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+              currentData = line.slice(5).trim();
+            } else if (line === '' && currentEvent && currentData) {
+              // End of event, process it
+              try {
+                const data = JSON.parse(currentData);
+                switch (currentEvent) {
+                  case 'thinking':
+                    handlers.onThinking?.(data as ThinkingEventData);
+                    break;
+                  case 'tool_call':
+                    handlers.onToolCall?.(data as ToolCallEventData);
+                    break;
+                  case 'message':
+                    handlers.onMessage?.(data as MessageEventData);
+                    break;
+                  case 'sql':
+                    handlers.onSQL?.(data as SQLEventData);
+                    break;
+                  case 'error':
+                    handlers.onError?.(data as ErrorEventData);
+                    break;
+                  case 'done':
+                    handlers.onDone?.(data as DoneEventData);
+                    break;
+                }
+              } catch (e) {
+                console.error('Failed to parse SSE data:', e);
+              }
+              currentEvent = '';
+              currentData = '';
+            }
+          }
+        }
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') {
+          // Request was cancelled
+          return;
+        }
+        handlers.onError?.({
+          error: (error as Error).message || 'Unknown error',
+        });
+      }
+    };
+
+    processStream();
+    return controller;
+  }
+
+  async cancelAgentQuery(dbName: string): Promise<{ cancelled: boolean }> {
+    try {
+      const response = await this.client.post(`/dbs/${dbName}/agent/cancel`);
       return response.data;
     } catch (error) {
       throw this.handleError(error as AxiosError<ErrorResponse>);

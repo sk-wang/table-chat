@@ -49,6 +49,56 @@ class QueryService:
                 "INSERT, UPDATE, DELETE, and DDL statements are not permitted."
             )
 
+    def validate_readonly(self, sql: str, dialect: str = "postgres") -> None:
+        """
+        Validate that SQL is a read-only operation.
+
+        Allows SELECT, DESCRIBE, SHOW, EXPLAIN statements.
+        Blocks INSERT, UPDATE, DELETE, and DDL statements.
+
+        Args:
+            sql: SQL statement to validate
+            dialect: SQL dialect (postgres or mysql)
+
+        Raises:
+            ValueError: If SQL is not a read-only statement
+        """
+        sql_upper = sql.strip().upper()
+
+        # Quick check for obviously dangerous statements
+        dangerous_prefixes = (
+            "INSERT", "UPDATE", "DELETE", "DROP", "CREATE", "ALTER",
+            "TRUNCATE", "GRANT", "REVOKE", "COMMIT", "ROLLBACK",
+        )
+        for prefix in dangerous_prefixes:
+            if sql_upper.startswith(prefix):
+                raise ValueError(
+                    f"Only read-only queries are allowed. Got: {prefix}. "
+                    "Data modification and DDL statements are not permitted."
+                )
+
+        # Allow DESCRIBE, SHOW, EXPLAIN without parsing
+        allowed_prefixes = ("SELECT", "DESCRIBE", "DESC", "SHOW", "EXPLAIN")
+        if any(sql_upper.startswith(prefix) for prefix in allowed_prefixes):
+            return
+
+        # Try to parse and validate
+        try:
+            parsed = self.parse_sql(sql, dialect)
+            if isinstance(parsed, exp.Select):
+                return
+            # For other parsed types, reject
+            stmt_type = type(parsed).__name__
+            raise ValueError(
+                f"Only read-only queries are allowed. Got: {stmt_type}. "
+                "Data modification and DDL statements are not permitted."
+            )
+        except ValueError:
+            raise
+        except Exception:
+            # If parsing fails but it looks safe, allow it (for DESCRIBE/SHOW variants)
+            pass
+
     def inject_limit(self, sql: str, parsed: exp.Expression, dialect: str = "postgres") -> tuple[str, bool]:
         """
         Add LIMIT 1000 if no LIMIT clause exists.

@@ -86,6 +86,89 @@ class TestQueryService:
         assert truncated is True
 
 
+class TestValidateReadonly:
+    """Test suite for validate_readonly method."""
+
+    def test_validate_readonly_select(self):
+        """Test SELECT is allowed."""
+        # Should not raise
+        query_service.validate_readonly("SELECT * FROM users")
+
+    def test_validate_readonly_describe(self):
+        """Test DESCRIBE is allowed."""
+        # Should not raise
+        query_service.validate_readonly("DESCRIBE users")
+
+    def test_validate_readonly_desc(self):
+        """Test DESC is allowed."""
+        # Should not raise
+        query_service.validate_readonly("DESC users")
+
+    def test_validate_readonly_show(self):
+        """Test SHOW is allowed."""
+        # Should not raise
+        query_service.validate_readonly("SHOW TABLES")
+
+    def test_validate_readonly_explain(self):
+        """Test EXPLAIN is allowed."""
+        # Should not raise
+        query_service.validate_readonly("EXPLAIN SELECT * FROM users")
+
+    def test_validate_readonly_insert_blocked(self):
+        """Test INSERT is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("INSERT INTO users VALUES (1, 'Test')")
+
+    def test_validate_readonly_update_blocked(self):
+        """Test UPDATE is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("UPDATE users SET name = 'Hacked'")
+
+    def test_validate_readonly_delete_blocked(self):
+        """Test DELETE is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("DELETE FROM users")
+
+    def test_validate_readonly_drop_blocked(self):
+        """Test DROP is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("DROP TABLE users")
+
+    def test_validate_readonly_create_blocked(self):
+        """Test CREATE is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("CREATE TABLE hacked (id INT)")
+
+    def test_validate_readonly_alter_blocked(self):
+        """Test ALTER is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("ALTER TABLE users ADD COLUMN hacked INT")
+
+    def test_validate_readonly_truncate_blocked(self):
+        """Test TRUNCATE is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("TRUNCATE TABLE users")
+
+    def test_validate_readonly_grant_blocked(self):
+        """Test GRANT is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("GRANT ALL ON users TO hacker")
+
+    def test_validate_readonly_revoke_blocked(self):
+        """Test REVOKE is blocked."""
+        with pytest.raises(ValueError, match="Only read-only queries are allowed"):
+            query_service.validate_readonly("REVOKE ALL ON users FROM hacker")
+
+    def test_validate_readonly_case_insensitive(self):
+        """Test validation is case insensitive."""
+        # Lowercase should work
+        query_service.validate_readonly("select * from users")
+        
+        # Mixed case dangerous statement should be blocked
+        with pytest.raises(ValueError):
+            query_service.validate_readonly("Insert INTO users VALUES (1)")
+
+
 @pytest.mark.asyncio
 class TestQueryServiceAsync:
     """Async test suite for QueryService."""

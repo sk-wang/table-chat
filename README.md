@@ -30,6 +30,16 @@
 - 生成结果包含中文解释
 - **智能导出识别**：识别"导出为 CSV"等意图自动触发导出
 
+### ⚡ Agent 模式（新功能）
+- **智能代理探索**：Agent 自动探索数据库结构，理解表关系
+- **工具调用可视化**：实时显示 Agent 的思考过程和工具执行详情
+  - 可折叠展开的工具调用块
+  - 显示输入参数、执行结果和耗时
+- **灵活的 SQL 生成**：不仅限于 SELECT，还支持生成 DDL 语句（CREATE INDEX、ALTER TABLE 等）
+- **一键复制到编辑器**：生成的 SQL 可直接填充到 SQL 编辑器
+- **三模式切换**：SQL 编辑器、自然语言、Agent 模式自由切换，编辑器内容保持不变
+- **降级支持**：未配置 Claude SDK 时，自动使用现有 LLM 服务
+
 ### 📊 结果展示与导出
 - 表格形式展示查询结果
 - 支持分页和排序
@@ -300,11 +310,30 @@ npm run test:e2e:ui
 
 ## ⚙️ 环境变量
 
+### LLM 配置（自然语言模式）
+
 | 变量名 | 描述 | 默认值 |
 |--------|------|--------|
 | `OPENAI_API_KEY` 或 `LLM_API_KEY` | LLM API 密钥 | - |
 | `OPENAI_BASE_URL` 或 `LLM_API_BASE` | LLM API 地址 | `https://api.openai.com/v1` |
 | `LLM_MODEL` | 使用的模型名称 | `gpt-3.5-turbo` |
+
+### Agent 配置（Agent 模式）
+
+| 变量名 | 描述 | 默认值 |
+|--------|------|--------|
+| `AGENT_API_BASE` | Claude Agent API 地址 | - |
+| `AGENT_API_KEY` | Claude Agent 认证 Token | - |
+| `AGENT_MODEL` | Agent 使用的模型 | `claude-sonnet-4-5` |
+| `AGENT_MAX_TURNS` | Agent 最大对话轮数 | `20` |
+| `AGENT_TIMEOUT` | Agent 请求超时时间（秒） | `120` |
+
+> **注意**：如果未配置 Agent 变量，Agent 模式会自动降级使用 LLM 配置。
+
+### 其他配置
+
+| 变量名 | 描述 | 默认值 |
+|--------|------|--------|
 | `DATABASE_PATH` | SQLite 存储路径 | `./scinew.db` |
 | `PORT` | 后端端口 | `7888` |
 

@@ -37,6 +37,13 @@ class Settings(BaseSettings):
     # MySQL Connection Timeout (seconds)
     mysql_connect_timeout: int = 10
 
+    # Agent Configuration (Claude Agent SDK)
+    agent_api_base: str = ""  # ANTHROPIC_BASE_URL equivalent
+    agent_api_key: str = ""   # ANTHROPIC_AUTH_TOKEN equivalent
+    agent_model: str = "claude-sonnet-4-5"
+    agent_max_turns: int = 20
+    agent_timeout: int = 120  # seconds
+
     @property
     def effective_llm_api_base(self) -> str:
         """Get effective LLM API base URL."""
@@ -51,6 +58,11 @@ class Settings(BaseSettings):
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured."""
         return bool(self.effective_llm_api_key)
+
+    @property
+    def is_agent_configured(self) -> bool:
+        """Check if Agent is properly configured."""
+        return bool(self.agent_api_base and self.agent_api_key)
 
 
 # Global settings instance
