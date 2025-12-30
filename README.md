@@ -1,259 +1,248 @@
-# TableChat - 智能数据库查询工具
+<p align="center">
+  <img src="https://raw.githubusercontent.com/microsoft/fluentui-emoji/main/assets/Robot/3D/robot_3d.png" width="120" alt="TableChat Logo"/>
+</p>
 
-一个现代化的数据库查询工具，支持 **PostgreSQL** 和 **MySQL** 数据库，提供 SQL 编辑器、自然语言查询、查询结果导出和执行历史记录功能。
+<h1 align="center">🤖 TableChat</h1>
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.13+-green.svg)
-![Node](https://img.shields.io/badge/node-18+-green.svg)
+<p align="center">
+  <strong>让 AI 帮你探索数据库、生成 SQL —— 像和专家对话一样简单</strong>
+</p>
 
-## ✨ 功能特性
+<p align="center">
+  <a href="#-核心亮点">核心亮点</a> •
+  <a href="#-快速开始">快速开始</a> •
+  <a href="#-功能特性">功能特性</a> •
+  <a href="#-技术栈">技术栈</a>
+</p>
 
-### 🗄️ 多数据库支持
-- **PostgreSQL** 和 **MySQL** 数据库连接管理
-- 添加、编辑、删除数据库连接
-- 支持禁用 SSL 连接（MySQL）
-- 连接 URL 密码自动脱敏显示
+<p align="center">
+  <img src="https://img.shields.io/badge/AI_Powered-Claude-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Powered"/>
+  <img src="https://img.shields.io/badge/Database-PostgreSQL_|_MySQL-blue?style=for-the-badge&logo=postgresql" alt="Database Support"/>
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker" alt="Docker Ready"/>
+</p>
 
-### 📝 SQL 编辑器
-- Monaco Editor 提供语法高亮、自动补全
-- 快捷键支持（Ctrl+Enter 执行查询）
-- 仅允许 SELECT 语句（安全限制）
-- 未指定 LIMIT 时自动添加 LIMIT 1000
-- **可调节面板比例**：编辑器与结果区域大小可拖拽调整，自动记忆
-
-### 🤖 智能自然语言查询
-- 用自然语言描述需求，AI 自动生成 SQL
-- **两阶段提示链优化**：支持大型数据库（3000+ 表）
-  - 第一阶段：智能选择相关表
-  - 第二阶段：基于选定表生成精准 SQL
-- 支持 PostgreSQL 和 MySQL 方言
-- 生成结果包含中文解释
-- **智能导出识别**：识别"导出为 CSV"等意图自动触发导出
-
-### ⚡ Agent 模式（新功能）
-- **智能代理探索**：基于 Anthropic Claude 的 Agent 自动探索数据库结构，理解表关系
-- **实时流式输出**：实时显示 Agent 的思考过程和工具执行详情
-  - 可折叠展开的工具调用块
-  - 显示输入参数、执行结果和耗时
-  - 流式文本增量显示，体验流畅
-- **灵活的 SQL 生成**：不仅限于 SELECT，还支持生成 DDL 语句（CREATE INDEX、ALTER TABLE 等）
-- **一键复制到编辑器**：生成的 SQL 可直接填充到 SQL 编辑器
-- **三模式切换**：SQL 编辑器、自然语言、Agent 模式自由切换，编辑器内容保持不变
-
-### 📊 结果展示与导出
-- 表格形式展示查询结果
-- 支持分页和排序
-- 显示执行时间和行数
-- 结果截断提示
-- **导出功能**：支持 CSV、JSON、XLSX 三种格式
-  - CSV：UTF-8 编码，Excel 兼容
-  - JSON：格式化输出，2 空格缩进
-  - XLSX：标准 Excel 格式，自动列宽
-
-### 📜 SQL 执行历史
-- 自动记录每次成功执行的 SQL 查询
-- 记录执行时间、返回行数、耗时信息
-- 保存自然语言描述（如有）
-- **全文搜索**：支持中文关键词搜索（jieba 分词）
-- 点击历史记录快速复用 SQL
-- 表格形式展示，参考阿里云 DMS 风格
-
-### 🔍 Schema 浏览器
-- 查看数据库表结构、字段信息
-- **表搜索功能**：快速过滤数百张表
-- 展示表/字段注释（类似阿里云 DMS）
-- 双击表名自动生成 SELECT 语句
-- 查看字段类型、主键、可空等信息
-
-### ⚡ 性能优化
-- **浏览器本地缓存**：减少重复请求，提升响应速度
-- 元数据智能缓存
-- 查询结果快速渲染
-- 按需加载表详情
-
-## 🛠️ 技术栈
-
-### 后端
-- **Python 3.13+** - 使用 uv 管理依赖
-- **FastAPI** - 高性能异步 API 框架
-- **SQLite** - 元数据存储 + FTS5 全文搜索
-- **asyncpg** - PostgreSQL 异步连接
-- **aiomysql** - MySQL 异步连接
-- **sqlglot** - SQL 解析与验证
-- **OpenAI SDK** - LLM 自然语言处理
-- **jieba** - 中文分词（支持中文搜索）
-
-### 前端
-- **React 19** + TypeScript 5.9
-- **Refine 5** - 管理后台框架
-- **Ant Design 5** - UI 组件库
-- **Monaco Editor** - 代码编辑器
-- **xlsx (SheetJS)** - Excel 导出
-- **localStorage** - 浏览器本地缓存
-
-## 🚀 快速开始
-
-### 方式一：Docker 部署（推荐）⭐
-
-使用 Docker 一键启动，无需安装 Python 和 Node.js 环境。
-
-**前置要求**：
-- Docker 24.0+
-- Docker Compose V2
-
-**启动步骤**：
-
-```bash
-# 1. 克隆项目
-git clone <repository-url>
-cd tableChat
-
-# 2. (可选) 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，配置 LLM_API_KEY 和 AGENT_API_KEY
-
-# 3. 启动所有服务
-docker compose up --build
-
-# 或后台运行
-docker compose up --build -d
-```
-
-**访问应用**：
-- 前端：http://localhost:5888
-- 后端 API：http://localhost:7888/docs
-
-**停止服务**：
-```bash
-docker compose down
-```
-
-**查看日志**：
-```bash
-docker compose logs -f
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.13+-green.svg" alt="Python 3.13+"/>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react" alt="React 19"/>
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"/>
+</p>
 
 ---
 
-### 方式二：本地开发部署
+## ✨ 核心亮点
 
-**前置要求**：
-- Python 3.13+ (推荐使用 [uv](https://github.com/astral-sh/uv))
-- Node.js 18+
-- PostgreSQL 或 MySQL 数据库（作为查询目标）
+<table>
+<tr>
+<td width="50%">
 
-### 1. 克隆项目
+### 🧠 AI Agent 模式
+
+不同于简单的 "文字转SQL"，TableChat 的 **Agent 模式** 让 AI 像一个真正的数据库专家一样工作：
+
+- 🔍 **自主探索** — AI 会主动查看表结构、理解表关系
+- 💭 **透明思考** — 实时看到 AI 的推理过程和工具调用
+- 🛠️ **智能工具使用** — 列表、查结构、试查询，步步为营
+- ✅ **生成任意 SQL** — SELECT、CREATE INDEX、ALTER TABLE 都行
+
+</td>
+<td width="50%">
+
+```
+👤 用户: 帮我给订单表的用户ID加个索引
+
+🤖 Agent 思考中...
+   ├─ 🔧 list_tables → 发现 orders, users, products...
+   ├─ 🔧 get_table_schema("orders") → 找到 user_id 字段
+   └─ 💡 生成: CREATE INDEX idx_orders_user_id 
+              ON orders(user_id);
+
+✅ SQL 已生成，点击复制到编辑器
+```
+
+</td>
+</tr>
+</table>
+
+### 🎯 为什么选择 Agent 模式？
+
+| 普通 AI 查询 | TableChat Agent |
+|:---:|:---:|
+| 依赖预设的表结构 | **自主探索**数据库 |
+| 一次生成，对错看运气 | **边验证边生成**，更准确 |
+| 只能 SELECT | **任意 SQL**（DDL/DML） |
+| 黑盒输出 | **透明展示**思考过程 |
+| 大库容易幻觉 | **3000+ 表**依然精准 |
+
+---
+
+## 🚀 快速开始
+
+**30 秒启动，无需安装 Python/Node 环境！**
 
 ```bash
-git clone <repository-url>
+# 1. 克隆项目
+git clone https://github.com/your-username/tableChat.git
 cd tableChat
-```
 
-### 2. 启动后端
-
-```bash
-cd backend
-
-# 安装依赖
-uv sync
-
-# 配置环境变量（可选，用于自然语言功能）
+# 2. 配置 API Key（Agent 模式需要）
 cp .env.example .env
-# 编辑 .env 配置 OPENAI_API_KEY
+# 编辑 .env，填入你的 Anthropic API Key:
+# AGENT_API_KEY=sk-ant-xxxxx
 
-# 启动开发服务器
-uv run uvicorn app.main:app --reload --port 7888
+# 3. 一键启动
+docker compose up --build -d
+
+# 🎉 完成！
+# 前端: http://localhost:5888
+# API:  http://localhost:7888/docs
 ```
 
-后端运行在 http://localhost:7888
-
-API 文档：http://localhost:7888/docs
-
-### 3. 启动前端
+<details>
+<summary>📋 <b>停止和日志</b></summary>
 
 ```bash
-cd frontend
+# 停止服务
+docker compose down
 
-# 安装依赖
-npm install
+# 查看日志
+docker compose logs -f
 
-# 启动开发服务器
-npm run dev
+# 重新构建
+docker compose up --build
 ```
 
-前端运行在 http://localhost:5173
+</details>
 
-## 📖 使用指南
+---
 
-### 添加数据库连接
+## 🎬 功能演示
 
-1. 打开应用，左侧边栏显示所有已添加的数据库
-2. 点击 **Add Database** 按钮
-3. 输入连接名称和连接字符串：
+### Agent 模式 — 智能探索数据库
 
-**PostgreSQL：**
-```
-postgresql://user:password@localhost:5432/mydb
-```
+<p align="center">
+  <img src="docs/img-2.png" alt="Agent Result" width="800"/>
+</p>
 
-**MySQL：**
-```
-mysql://user:password@localhost:3306/mydb
-```
+> 💡 AI 自动探索表结构 → 执行验证查询 → 生成精准 SQL → Markdown 格式化输出
 
-4. 点击 **Save** 保存
+### 工具调用 — 透明的思考过程
 
-### 执行 SQL 查询
+<p align="center">
+  <img src="docs/img-1.png" alt="Agent Panel" width="800"/>
+</p>
 
-1. 在左侧边栏选择目标数据库
-2. 在 SQL 编辑器中输入查询语句
-3. 点击 **Execute** 或按 `Ctrl+Enter` 执行
+> 🔧 可折叠的工具调用块，显示 `list_tables` → `get_table_schema` → `query_database` 完整链路
 
-**注意事项：**
-- 仅支持 SELECT 语句（安全限制）
-- 未指定 LIMIT 时自动添加 LIMIT 1000
+### 三种查询模式，自由切换
 
-### 导出查询结果
+| SQL 编辑器 | 自然语言 | Agent 模式 |
+|:---:|:---:|:---:|
+| Monaco Editor | 简单场景快速生成 | 复杂场景智能探索 |
+| 语法高亮、自动补全 | 两阶段提示链优化 | 实时流式输出 |
+| Ctrl+Enter 执行 | 支持大型数据库 | 可折叠工具调用 |
 
-执行查询后，可以通过以下方式导出结果：
+---
 
-**方式一：工具栏按钮**
-1. 执行 SQL 查询获得结果
-2. 点击结果区域上方的「导出」下拉按钮
-3. 选择导出格式：CSV / JSON / XLSX
+## 🔥 功能特性
 
-**方式二：自然语言触发**
-1. 在自然语言输入框中描述需求，包含导出意图
-   - 例如："查询所有用户并导出为 CSV"
-   - 例如："导出最近30天的订单数据为 Excel"
-2. 系统自动生成 SQL 并在执行后自动导出
+<table>
+<tr>
+<td valign="top" width="50%">
 
-导出文件命名格式：`{数据库名}_{时间戳}.{格式}`
+### 🤖 AI 能力
 
-### 自然语言查询
+- **Agent 模式** — Claude 驱动的智能代理
+  - 实时流式输出思考过程
+  - 可折叠的工具调用详情
+  - 一键复制 SQL 到编辑器
+- **自然语言查询** — 简单场景快速生成
+  - 两阶段提示链，支持 3000+ 表
+  - 智能识别导出意图
 
-1. 切换到 **自然语言** 标签
-2. 输入查询描述，如："查询所有活跃用户的邮箱"
-3. 点击 **生成 SQL**
-4. 检查生成的 SQL 后执行
+### 🗄️ 数据库支持
 
-**提示：** 系统会自动识别相关表，即使数据库有数千张表也能快速生成准确的 SQL。
+- PostgreSQL / MySQL 双支持
+- 添加、编辑、删除连接
+- 密码自动脱敏显示
+- SSL 可选配置
 
-### 查看执行历史
+</td>
+<td valign="top" width="50%">
 
-1. 切换到结果区域的 **执行历史** 标签
-2. 查看过去执行的 SQL 记录
-3. 使用搜索框按关键词过滤（支持中文）
-4. 点击历史记录将 SQL 复制到编辑器
+### 📝 SQL 编辑器
 
-### 浏览数据库结构
+- Monaco Editor 语法高亮
+- 快捷键 Ctrl+Enter 执行
+- 安全限制仅 SELECT
+- 自动 LIMIT 1000
 
-在左侧 Schema 浏览器中：
-- 使用**搜索框**快速过滤表名
-- 展开查看表和视图列表
-- 双击表名自动生成 SELECT 语句
-- 查看字段类型、主键、可空等信息
-- 查看表和字段的注释
+### 📊 结果 & 导出
+
+- 表格展示 + 分页排序
+- 导出 CSV / JSON / XLSX
+- 执行历史 + 中文全文搜索
+
+### 🔍 Schema 浏览器
+
+- 快速搜索过滤表名
+- 表/字段注释显示
+- 双击生成 SELECT
+
+</td>
+</tr>
+</table>
+
+---
+
+## ⚙️ 环境变量
+
+### Agent 模式配置（推荐）
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `AGENT_API_KEY` | Anthropic API Key（必填） | `sk-ant-api03-xxxxx` |
+| `AGENT_API_BASE` | API 地址（可选） | `https://api.anthropic.com` |
+| `AGENT_MODEL` | 使用的模型 | `claude-sonnet-4-5-20250929` |
+
+### 自然语言模式配置（可选）
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `LLM_API_KEY` | OpenAI 兼容 API Key | - |
+| `LLM_API_BASE` | API 地址 | `https://api.openai.com/v1` |
+| `LLM_MODEL` | 模型名称 | `gpt-3.5-turbo` |
+
+---
+
+## 🛠️ 技术栈
+
+<table>
+<tr>
+<td align="center" width="33%">
+<h3>🐍 后端</h3>
+Python 3.13 + FastAPI<br/>
+Anthropic SDK<br/>
+asyncpg / aiomysql<br/>
+SQLite + FTS5
+</td>
+<td align="center" width="33%">
+<h3>⚛️ 前端</h3>
+React 19 + TypeScript<br/>
+Ant Design 5<br/>
+Monaco Editor<br/>
+Refine 5
+</td>
+<td align="center" width="33%">
+<h3>🐳 部署</h3>
+Docker Compose<br/>
+Nginx<br/>
+Health Check<br/>
+Volume 持久化
+</td>
+</tr>
+</table>
+
+---
 
 ## 📁 项目结构
 
@@ -261,148 +250,47 @@ mysql://user:password@localhost:3306/mydb
 tableChat/
 ├── backend/                 # Python 后端
 │   ├── app/
-│   │   ├── api/v1/         # API 路由
-│   │   ├── connectors/     # 数据库连接器（PostgreSQL/MySQL）
-│   │   ├── models/         # Pydantic 模型
-│   │   ├── services/       # 业务逻辑（LLM、历史记录等）
-│   │   └── db/             # SQLite 存储 + FTS5 全文搜索
-│   ├── tests/              # 测试用例
-│   └── pyproject.toml
+│   │   ├── api/v1/         # API 路由 (含 agent 端点)
+│   │   ├── services/       # 业务逻辑 (agent_service, agent_tools)
+│   │   ├── connectors/     # 数据库连接器
+│   │   └── models/         # Pydantic 模型
+│   └── Dockerfile
 ├── frontend/               # React 前端
 │   ├── src/
-│   │   ├── components/     # React 组件
-│   │   │   ├── database/   # 数据库管理组件
-│   │   │   ├── editor/     # SQL 编辑器组件
-│   │   │   ├── export/     # 导出功能组件
-│   │   │   ├── history/    # 执行历史组件
-│   │   │   ├── results/    # 查询结果组件
-│   │   │   ├── sidebar/    # 侧边栏（含表搜索）
-│   │   │   └── layout/     # 布局组件（可调节面板）
-│   │   ├── pages/          # 页面
-│   │   ├── contexts/       # React Context
-│   │   ├── services/       # API 客户端 + 缓存服务
-│   │   ├── test/           # 单元测试
-│   │   └── types/          # TypeScript 类型
-│   ├── e2e/                # E2E 测试
-│   └── package.json
-├── specs/                  # 设计规格文档
-├── api-tests.rest          # API 测试用例
-└── README.md
+│   │   ├── components/
+│   │   │   ├── agent/     # 🤖 Agent 模式组件
+│   │   │   ├── editor/    # SQL 编辑器
+│   │   │   └── ...
+│   │   └── pages/
+│   └── Dockerfile
+└── docker-compose.yml      # 一键部署
 ```
 
-## 🧪 运行测试
+---
 
-### 后端测试
+## 🗺️ Roadmap
 
-```bash
-cd backend
+- [x] 🤖 Agent 模式 (Claude)
+- [x] 💬 自然语言查询
+- [x] 🗄️ PostgreSQL + MySQL
+- [x] 📊 多格式导出
+- [x] 📜 执行历史 + 中文搜索
+- [ ] 🔐 SSH 隧道支持
+- [ ] 📝 查询收藏
+- [ ] 👥 多用户支持
 
-# 运行所有测试
-uv run pytest
-
-# 运行带覆盖率
-uv run pytest --cov=app
-
-# 仅运行单元测试（排除集成测试）
-uv run pytest -m "not integration"
-```
-
-### 前端测试
-
-```bash
-cd frontend
-
-# 单元测试（111 个测试用例）
-npm run test
-
-# E2E 测试（需要先启动服务）
-npm run test:e2e
-
-# E2E 可视化模式
-npm run test:e2e:ui
-```
-
-## 🔧 API 参考
-
-### 数据库管理
-
-| 方法 | 端点 | 描述 |
-|------|------|------|
-| GET | `/api/v1/dbs` | 列出所有数据库连接 |
-| GET | `/api/v1/dbs/{name}` | 获取数据库详情 |
-| PUT | `/api/v1/dbs/{name}` | 创建/更新数据库连接 |
-| DELETE | `/api/v1/dbs/{name}` | 删除数据库连接 |
-| GET | `/api/v1/dbs/{name}/metadata/tables` | 获取表列表 |
-| GET | `/api/v1/dbs/{name}/metadata/tables/{schema}/{table}` | 获取表详情 |
-
-### 查询执行
-
-| 方法 | 端点 | 描述 |
-|------|------|------|
-| POST | `/api/v1/dbs/{name}/query` | 执行 SQL 查询 |
-| POST | `/api/v1/dbs/{name}/query/natural` | 自然语言生成 SQL |
-
-### 执行历史
-
-| 方法 | 端点 | 描述 |
-|------|------|------|
-| GET | `/api/v1/dbs/{name}/history` | 获取执行历史列表 |
-| GET | `/api/v1/dbs/{name}/history/search?query=xxx` | 搜索执行历史 |
-
-完整 API 文档请访问：http://localhost:7888/docs
-
-## ⚙️ 环境变量
-
-### LLM 配置（自然语言模式）
-
-| 变量名 | 描述 | 默认值 |
-|--------|------|--------|
-| `OPENAI_API_KEY` 或 `LLM_API_KEY` | LLM API 密钥 | - |
-| `OPENAI_BASE_URL` 或 `LLM_API_BASE` | LLM API 地址 | `https://api.openai.com/v1` |
-| `LLM_MODEL` | 使用的模型名称 | `gpt-3.5-turbo` |
-
-### Agent 配置（Agent 模式）
-
-| 变量名 | 描述 | 默认值 |
-|--------|------|--------|
-| `AGENT_API_KEY` | Anthropic API Key（必填） | - |
-| `AGENT_API_BASE` | Anthropic API 地址（可选，用于自定义端点） | api.anthropic.com |
-| `AGENT_MODEL` | Agent 使用的模型 | `claude-sonnet-4-5-20250929` |
-| `AGENT_MAX_TURNS` | Agent 最大对话轮数 | `20` |
-| `AGENT_TIMEOUT` | Agent 请求超时时间（秒） | `120` |
-
-> **注意**：如果未配置 Agent 变量，Agent 模式会自动降级使用 LLM 配置。
-
-### 其他配置
-
-| 变量名 | 描述 | 默认值 |
-|--------|------|--------|
-| `DATABASE_PATH` | SQLite 存储路径 | `./scinew.db` |
-| `PORT` | 后端端口 | `7888` |
-
-## 🗺️ 功能路线图
-
-- [x] 基础 SQL 查询功能
-- [x] PostgreSQL 支持
-- [x] MySQL 支持
-- [x] Schema 注释显示
-- [x] 表搜索功能
-- [x] 两阶段提示链（支持大型数据库）
-- [x] 浏览器本地缓存
-- [x] 可调节查询面板比例
-- [x] SQL 执行历史记录（含中文搜索）
-- [x] 导出功能（CSV/JSON/XLSX）
-- [x] 自然语言触发导出
-- [ ] SSH 隧道支持
+---
 
 ## 📄 License
 
-MIT License - 详见 [LICENSE](LICENSE)
+MIT License
 
-## 📚 相关文档
+---
 
-- [快速开始指南](QUICKSTART.md)
-- [测试指南](TESTING.md)
-- [代码分析报告](CODEBASE_ANALYSIS.md)
-- [导出功能设计](specs/010-query-export/spec.md)
-- [API 测试集合](api-tests.rest)
+<p align="center">
+  <strong>⭐ 如果觉得有用，请给个 Star ⭐</strong>
+</p>
+
+<p align="center">
+  Made with ❤️ by the TableChat Team
+</p>

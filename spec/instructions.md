@@ -124,3 +124,6 @@ UI 布局方案，应该是和自然语言做一个同级的选项卡agent，然
 
 ## 写一个github吸引眼球的readme文件
 重点体现 AI Agent的功能，然后部署只写docker，readme里面不写其他部署模式了。
+
+## 自动保存记忆
+对于明确指出问题的意图时，总结fact和narrative到记忆中，在调取ai agent的时候自动带上这些记忆。
