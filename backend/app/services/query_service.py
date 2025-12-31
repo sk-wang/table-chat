@@ -137,23 +137,21 @@ class QueryService:
             ValueError: If database not found
             Exception: If query execution fails
         """
-        # Get database info including ssl_disabled
+        # Get database info
         db = await database_manager.get_database(db_name)
         if not db:
             raise ValueError(f"Database '{db_name}' not found")
 
         url = db["url"]
-        db_type = db.get("db_type", "postgresql")
-        ssl_disabled = bool(db.get("ssl_disabled", 0))
 
-        # Get connector and execute query
+        # Get connector
         connector = ConnectorFactory.get_connector(url)
 
-        # Pass ssl_disabled for MySQL
-        if db_type == "mysql":
-            return await connector.execute_query(url, sql, ssl_disabled)
-        else:
-            return await connector.execute_query(url, sql)
+        # Get SSH tunnel endpoint if configured
+        tunnel_endpoint = await database_manager.get_tunnel_endpoint(db_name)
+
+        # Execute query (with tunnel if configured)
+        return await connector.execute_query(url, sql, tunnel_endpoint)
 
     async def execute_validated_query(
         self, db_name: str, sql: str
@@ -171,14 +169,12 @@ class QueryService:
         Raises:
             ValueError: If SQL is invalid or not a SELECT statement
         """
-        # Get database info including ssl_disabled
+        # Get database info
         db = await database_manager.get_database(db_name)
         if not db:
             raise ValueError(f"Database '{db_name}' not found")
 
         url = db["url"]
-        db_type = db.get("db_type", "postgresql")
-        ssl_disabled = bool(db.get("ssl_disabled", 0))
 
         connector = ConnectorFactory.get_connector(url)
         dialect = connector.get_dialect()
@@ -192,11 +188,13 @@ class QueryService:
         # Inject LIMIT if needed
         final_sql, truncated = self.inject_limit(sql, parsed, dialect)
 
-        # Execute query with ssl_disabled for MySQL
-        if db_type == "mysql":
-            columns, rows, execution_time_ms = await connector.execute_query(url, final_sql, ssl_disabled)
-        else:
-            columns, rows, execution_time_ms = await connector.execute_query(url, final_sql)
+        # Get SSH tunnel endpoint if configured
+        tunnel_endpoint = await database_manager.get_tunnel_endpoint(db_name)
+
+        # Execute query (with tunnel if configured)
+        columns, rows, execution_time_ms = await connector.execute_query(
+            url, final_sql, tunnel_endpoint
+        )
 
         return final_sql, columns, rows, execution_time_ms, truncated
 

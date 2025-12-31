@@ -19,6 +19,7 @@ dependencies = [
     "jieba>=0.42.1",
     "anthropic>=0.75.0",
     "sse-starlette>=2.0.0",
+    "asyncssh>=2.14.0",
 ]
 
 [project.optional-dependencies]

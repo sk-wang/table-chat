@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import router as v1_router
 from app.config import settings
 from app.db.sqlite import db_manager
+from app.services.ssh_tunnel import ssh_tunnel_manager
 from app.services.tokenizer import initialize_jieba
 
 
@@ -20,7 +21,8 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     # Startup: Initialize database schema
     await db_manager.init_schema()
     yield
-    # Shutdown: Nothing to clean up
+    # Shutdown: Close all SSH tunnels
+    await ssh_tunnel_manager.close_all()
 
 
 app = FastAPI(

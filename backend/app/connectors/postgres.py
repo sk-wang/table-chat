@@ -3,6 +3,7 @@
 import asyncio
 import time
 from typing import Any
+from urllib.parse import ParseResult, parse_qs, urlparse, urlunparse
 
 import psycopg2
 from psycopg2.extensions import connection as PgConnection
@@ -24,12 +25,49 @@ class PostgreSQLConnector(DatabaseConnector):
             return "postgresql"
         raise ValueError(f"Unsupported database URL: {url}")
 
-    async def test_connection(self, url: str, timeout: int) -> None:
+    def _rewrite_url_for_tunnel(self, url: str, tunnel_endpoint: tuple[str, int]) -> str:
+        """Rewrite database URL to use SSH tunnel endpoint.
+
+        Args:
+            url: Original database connection URL
+            tunnel_endpoint: (host, port) tuple of local tunnel endpoint
+
+        Returns:
+            Modified URL pointing to tunnel endpoint
+        """
+        parsed = urlparse(url)
+        # Replace host and port with tunnel endpoint
+        netloc_parts = parsed.netloc.split("@")
+        if len(netloc_parts) == 2:
+            # Has credentials: user:pass@host:port
+            credentials, _ = netloc_parts
+            new_netloc = f"{credentials}@{tunnel_endpoint[0]}:{tunnel_endpoint[1]}"
+        else:
+            # No credentials: host:port
+            new_netloc = f"{tunnel_endpoint[0]}:{tunnel_endpoint[1]}"
+
+        new_parsed = ParseResult(
+            scheme=parsed.scheme,
+            netloc=new_netloc,
+            path=parsed.path,
+            params=parsed.params,
+            query=parsed.query,
+            fragment=parsed.fragment,
+        )
+        return urlunparse(new_parsed)
+
+    async def test_connection(
+        self, url: str, timeout: int, tunnel_endpoint: tuple[str, int] | None = None
+    ) -> None:
         """Test PostgreSQL connection."""
+        # Use tunnel endpoint if provided
+        connection_url = (
+            self._rewrite_url_for_tunnel(url, tunnel_endpoint) if tunnel_endpoint else url
+        )
 
         def _connect() -> PgConnection:
             try:
-                conn = psycopg2.connect(url, connect_timeout=timeout)
+                conn = psycopg2.connect(connection_url, connect_timeout=timeout)
                 conn.close()
                 return conn
             except psycopg2.OperationalError as e:
@@ -40,15 +78,19 @@ class PostgreSQLConnector(DatabaseConnector):
         await asyncio.to_thread(_connect)
 
     async def fetch_metadata(
-        self, url: str
+        self, url: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[TableMetadata]]:
         """Fetch PostgreSQL metadata."""
+        # Use tunnel endpoint if provided
+        connection_url = (
+            self._rewrite_url_for_tunnel(url, tunnel_endpoint) if tunnel_endpoint else url
+        )
 
         def _fetch() -> tuple[list[str], list[TableMetadata]]:
             conn: PgConnection | None = None
 
             try:
-                conn = psycopg2.connect(url)
+                conn = psycopg2.connect(connection_url)
                 cursor = conn.cursor()
 
                 # Get all schemas
@@ -166,16 +208,20 @@ class PostgreSQLConnector(DatabaseConnector):
         return await asyncio.to_thread(_fetch)
 
     async def execute_query(
-        self, url: str, sql: str
+        self, url: str, sql: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """Execute PostgreSQL query."""
+        # Use tunnel endpoint if provided
+        connection_url = (
+            self._rewrite_url_for_tunnel(url, tunnel_endpoint) if tunnel_endpoint else url
+        )
 
         def _execute() -> tuple[list[str], list[dict[str, Any]], int]:
             start_time = time.time()
             conn: PgConnection | None = None
 
             try:
-                conn = psycopg2.connect(url)
+                conn = psycopg2.connect(connection_url)
                 cursor = conn.cursor()
 
                 cursor.execute(sql)

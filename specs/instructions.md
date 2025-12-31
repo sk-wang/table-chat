@@ -106,7 +106,7 @@ AI Agent 任务分解：在 Claude Code 中，尝试将“导出数据”这个�
 查询结果和SQL编辑器中间做一个可调节这两个部分比例的滑块，并且把上次调整的位置记录到localstorage里面去。
 
 ## 支持SSH
-需要支持SSH，以访问一些不能直连的数据库
+需要支持OVER SSH，以访问一些不能直连的数据库
 
 ## 利用claude code sdk完成sql的生成
 把现在的自然语言的功能叫做普通模式，保留，再加一个agent模式，可以在普通模式和agent模式之间切换切换的。agent模式采用claude code sdk，来实现一个agent，配置是这俩：(export ANTHROPIC_BASE_URL="http://localhost:3000/api"

@@ -50,6 +50,10 @@ MIGRATION_ADD_SSL_DISABLED = """
 ALTER TABLE databases ADD COLUMN ssl_disabled INTEGER DEFAULT 0;
 """
 
+MIGRATION_ADD_SSH_CONFIG = """
+ALTER TABLE databases ADD COLUMN ssh_config TEXT;
+"""
+
 # Query history table schema
 QUERY_HISTORY_SCHEMA = """
 CREATE TABLE IF NOT EXISTS query_history (
@@ -100,6 +104,7 @@ class SQLiteManager:
             await self._migrate_add_db_type(conn)
             await self._migrate_add_table_comment(conn)
             await self._migrate_add_ssl_disabled(conn)
+            await self._migrate_add_ssh_config(conn)
             await self._migrate_add_query_history(conn)
 
     async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
@@ -141,6 +146,19 @@ class SQLiteManager:
                 # Column already exists or other error, ignore
                 pass
 
+    async def _migrate_add_ssh_config(self, conn: aiosqlite.Connection) -> None:
+        """Add ssh_config column if it doesn't exist (migration for existing DBs)."""
+        cursor = await conn.execute("PRAGMA table_info(databases)")
+        columns = await cursor.fetchall()
+        column_names = [col[1] for col in columns]
+        if "ssh_config" not in column_names:
+            try:
+                await conn.execute(MIGRATION_ADD_SSH_CONFIG)
+                await conn.commit()
+            except Exception:
+                # Column already exists or other error, ignore
+                pass
+
     async def _migrate_add_query_history(self, conn: aiosqlite.Connection) -> None:
         """Create query_history table and FTS5 index if they don't exist."""
         # Check if query_history table exists
@@ -173,7 +191,7 @@ class SQLiteManager:
         """List all saved database connections."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, db_type, ssl_disabled, created_at, updated_at FROM databases ORDER BY name"
+                "SELECT name, url, db_type, ssl_disabled, ssh_config, created_at, updated_at FROM databases ORDER BY name"
             )
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -182,14 +200,19 @@ class SQLiteManager:
         """Get a database connection by name."""
         async with self.get_connection() as conn:
             cursor = await conn.execute(
-                "SELECT name, url, db_type, ssl_disabled, created_at, updated_at FROM databases WHERE name = ?",
+                "SELECT name, url, db_type, ssl_disabled, ssh_config, created_at, updated_at FROM databases WHERE name = ?",
                 (name,),
             )
             row = await cursor.fetchone()
             return dict(row) if row else None
 
     async def create_or_update_database(
-        self, name: str, url: str, db_type: str = "postgresql", ssl_disabled: bool = False
+        self,
+        name: str,
+        url: str,
+        db_type: str = "postgresql",
+        ssl_disabled: bool = False,
+        ssh_config: str | None = None,
     ) -> dict[str, Any]:
         """Create or update a database connection."""
         now = datetime.now().isoformat()
@@ -199,13 +222,13 @@ class SQLiteManager:
             existing = await self.get_database(name)
             if existing:
                 await conn.execute(
-                    "UPDATE databases SET url = ?, db_type = ?, ssl_disabled = ?, updated_at = ? WHERE name = ?",
-                    (url, db_type, ssl_disabled_int, now, name),
+                    "UPDATE databases SET url = ?, db_type = ?, ssl_disabled = ?, ssh_config = ?, updated_at = ? WHERE name = ?",
+                    (url, db_type, ssl_disabled_int, ssh_config, now, name),
                 )
             else:
                 await conn.execute(
-                    "INSERT INTO databases (name, url, db_type, ssl_disabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (name, url, db_type, ssl_disabled_int, now, now),
+                    "INSERT INTO databases (name, url, db_type, ssl_disabled, ssh_config, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (name, url, db_type, ssl_disabled_int, ssh_config, now, now),
                 )
             await conn.commit()
 

@@ -1,8 +1,20 @@
 // === Request Types ===
 
+export interface SSHConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  authType: 'password' | 'key';
+  password?: string;
+  privateKey?: string;
+  keyPassphrase?: string;
+}
+
 export interface DatabaseCreateRequest {
   url: string;
   sslDisabled?: boolean;
+  sshConfig?: SSHConfig;
 }
 
 export interface QueryRequest {
@@ -19,11 +31,21 @@ export interface NaturalQueryRequest {
 // Re-export metadata types from metadata.ts to avoid duplication
 export type { ColumnInfo, TableSummary, TableMetadata, DatabaseMetadata, TableListResponse } from './metadata';
 
+export interface SSHConfigResponse {
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  authType: 'password' | 'key';
+  // Note: password, privateKey, and keyPassphrase are not included in response
+}
+
 export interface DatabaseResponse {
   name: string;
   url: string;
   dbType: 'postgresql' | 'mysql';
   sslDisabled: boolean;
+  sshConfig: SSHConfigResponse | null;
   createdAt: string;
   updatedAt: string;
 }

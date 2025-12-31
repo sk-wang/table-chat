@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, Radio, Space, Typography, Checkbox, App } from 'antd';
-import type { DatabaseResponse } from '../../types';
+import { Modal, Form, Input, Radio, Space, Typography, Checkbox, App, Collapse, Switch } from 'antd';
+import type { DatabaseResponse, SSHConfig } from '../../types';
 import { apiClient } from '../../services/api';
 
 const { Text } = Typography;
+const { Panel } = Collapse;
 
 interface AddDatabaseModalProps {
   open: boolean;
@@ -46,6 +47,8 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [dbType, setDbType] = useState<DbType>('postgresql');
+  const [sshEnabled, setSshEnabled] = useState(false);
+  const [sshAuthType, setSshAuthType] = useState<'password' | 'key'>('password');
 
   // Get current database type config
   const dbConfig = useMemo(() => DB_TYPES[dbType], [dbType]);
@@ -59,9 +62,26 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
       });
       // Set dbType based on existing database
       setDbType(editingDatabase.dbType as DbType || 'postgresql');
+
+      // Load SSH config if exists
+      if (editingDatabase.sshConfig && editingDatabase.sshConfig.enabled) {
+        setSshEnabled(true);
+        setSshAuthType(editingDatabase.sshConfig.authType);
+        form.setFieldsValue({
+          sshHost: editingDatabase.sshConfig.host,
+          sshPort: editingDatabase.sshConfig.port,
+          sshUsername: editingDatabase.sshConfig.username,
+          sshAuthType: editingDatabase.sshConfig.authType,
+        });
+      } else {
+        setSshEnabled(false);
+        setSshAuthType('password');
+      }
     } else if (open) {
       form.resetFields();
       setDbType('postgresql');
+      setSshEnabled(false);
+      setSshAuthType('password');
     }
   }, [open, editingDatabase, form]);
 
@@ -80,9 +100,32 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
       const values = await form.validateFields();
       setLoading(true);
 
+      // Build SSH config if enabled
+      let sshConfig: SSHConfig | undefined = undefined;
+      if (sshEnabled) {
+        sshConfig = {
+          enabled: true,
+          host: values.sshHost,
+          port: values.sshPort || 22,
+          username: values.sshUsername,
+          authType: values.sshAuthType,
+        };
+
+        // Add authentication credentials
+        if (values.sshAuthType === 'password') {
+          sshConfig.password = values.sshPassword;
+        } else {
+          sshConfig.privateKey = values.sshPrivateKey;
+          if (values.sshKeyPassphrase) {
+            sshConfig.keyPassphrase = values.sshKeyPassphrase;
+          }
+        }
+      }
+
       await apiClient.createOrUpdateDatabase(values.name, {
         url: values.url,
         sslDisabled: values.sslDisabled || false,
+        sshConfig,
       });
 
       message.success(
@@ -205,6 +248,183 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
           >
             <Checkbox>禁用 SSL</Checkbox>
           </Form.Item>
+        )}
+
+        {/* SSH Tunnel Configuration */}
+        <Form.Item label="SSH Tunnel" style={{ marginBottom: 8 }}>
+          <Space align="center">
+            <Switch
+              checked={sshEnabled}
+              onChange={(checked) => {
+                setSshEnabled(checked);
+                if (!checked) {
+                  // Clear SSH fields when disabled
+                  form.setFieldsValue({
+                    sshHost: undefined,
+                    sshPort: undefined,
+                    sshUsername: undefined,
+                    sshPassword: undefined,
+                    sshPrivateKey: undefined,
+                    sshKeyPassphrase: undefined,
+                  });
+                }
+              }}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {sshEnabled ? 'Enabled' : 'Disabled'}
+            </Text>
+          </Space>
+        </Form.Item>
+
+        {sshEnabled && (
+          <Collapse
+            defaultActiveKey={['ssh']}
+            style={{ marginBottom: 16 }}
+            bordered={false}
+          >
+            <Panel header="SSH Configuration" key="ssh">
+              {/* SSH Host */}
+              <Form.Item
+                name="sshHost"
+                label="SSH Host"
+                rules={[
+                  { required: sshEnabled, message: 'Please enter SSH host' },
+                ]}
+              >
+                <Input placeholder="example.com or 192.168.1.1" />
+              </Form.Item>
+
+              {/* SSH Port */}
+              <Form.Item
+                name="sshPort"
+                label="SSH Port"
+                initialValue={22}
+                rules={[
+                  { required: sshEnabled, message: 'Please enter SSH port' },
+                  {
+                    type: 'number',
+                    min: 1,
+                    max: 65535,
+                    message: 'Port must be between 1 and 65535',
+                    transform: (value) => Number(value),
+                  },
+                ]}
+              >
+                <Input type="number" placeholder="22" />
+              </Form.Item>
+
+              {/* SSH Username */}
+              <Form.Item
+                name="sshUsername"
+                label="SSH Username"
+                rules={[
+                  { required: sshEnabled, message: 'Please enter SSH username' },
+                ]}
+              >
+                <Input placeholder="root or your-username" />
+              </Form.Item>
+
+              {/* Authentication Type Selector */}
+              <Form.Item
+                name="sshAuthType"
+                label="Authentication Type"
+                initialValue="password"
+              >
+                <Radio.Group
+                  value={sshAuthType}
+                  onChange={(e) => {
+                    setSshAuthType(e.target.value);
+                    // Clear opposite auth fields when switching
+                    if (e.target.value === 'password') {
+                      form.setFieldsValue({
+                        sshPrivateKey: undefined,
+                        sshKeyPassphrase: undefined,
+                      });
+                    } else {
+                      form.setFieldsValue({
+                        sshPassword: undefined,
+                      });
+                    }
+                  }}
+                >
+                  <Radio.Button value="password">Password</Radio.Button>
+                  <Radio.Button value="key">Private Key</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+
+              {/* Password Authentication */}
+              {sshAuthType === 'password' && (
+                <Form.Item
+                  name="sshPassword"
+                  label="SSH Password"
+                  rules={[
+                    {
+                      required: sshEnabled && sshAuthType === 'password',
+                      message: 'Please enter SSH password',
+                    },
+                  ]}
+                  extra={
+                    editingDatabase && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Leave empty to keep existing password
+                      </Text>
+                    )
+                  }
+                >
+                  <Input.Password placeholder="Your SSH password" />
+                </Form.Item>
+              )}
+
+              {/* Private Key Authentication */}
+              {sshAuthType === 'key' && (
+                <>
+                  <Form.Item
+                    name="sshPrivateKey"
+                    label="Private Key"
+                    rules={[
+                      {
+                        required: sshEnabled && sshAuthType === 'key',
+                        message: 'Please enter private key',
+                      },
+                    ]}
+                    extra={
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Paste your private key content (OpenSSH or PEM format)
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          Example: -----BEGIN RSA PRIVATE KEY----- ...
+                        </Text>
+                        {editingDatabase && (
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            Leave empty to keep existing private key
+                          </Text>
+                        )}
+                      </Space>
+                    }
+                  >
+                    <Input.TextArea
+                      rows={6}
+                      placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
+                      style={{ fontFamily: 'monospace', fontSize: 12 }}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="sshKeyPassphrase"
+                    label="Key Passphrase (Optional)"
+                    extra={
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Only required if your private key is encrypted
+                      </Text>
+                    }
+                  >
+                    <Input.Password placeholder="Leave empty if key has no passphrase" />
+                  </Form.Item>
+                </>
+              )}
+            </Panel>
+          </Collapse>
         )}
       </Form>
     </Modal>

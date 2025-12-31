@@ -1,5 +1,6 @@
 """Database connection API endpoints."""
 
+import json
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -12,10 +13,26 @@ from app.models.database import (
 )
 from app.models.error import ErrorResponse
 from app.models.metadata import DatabaseMetadata, TableListResponse, TableMetadata
+from app.models.ssh import SSHConfigResponse
 from app.services.db_manager import database_manager
 from app.services.metadata_service import metadata_service
 
 router = APIRouter(prefix="/dbs", tags=["Databases"])
+
+
+def _parse_ssh_config_response(ssh_config_json: str | None) -> SSHConfigResponse | None:
+    """Parse SSH config JSON to response model (sanitized)."""
+    if not ssh_config_json:
+        return None
+
+    config = json.loads(ssh_config_json)
+    return SSHConfigResponse(
+        enabled=config.get("enabled", False),
+        host=config.get("host", ""),
+        port=config.get("port", 22),
+        username=config.get("username", ""),
+        auth_type=config.get("authType", "password"),
+    )
 
 
 @router.get(
@@ -27,13 +44,14 @@ async def list_databases() -> DatabaseListResponse:
     """Get list of all saved database connections."""
     dbs = await database_manager.list_databases()
 
-    # Mask passwords in URLs
+    # Mask passwords in URLs and parse SSH config
     databases = [
         DatabaseResponse(
             name=db["name"],
             url=mask_password_in_url(db["url"]),
             db_type=db.get("db_type", "postgresql"),
             ssl_disabled=bool(db.get("ssl_disabled", 0)),
+            ssh_config=_parse_ssh_config_response(db.get("ssh_config")),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )
@@ -66,6 +84,7 @@ async def get_database(name: str) -> DatabaseResponse:
         url=mask_password_in_url(db["url"]),
         db_type=db.get("db_type", "postgresql"),
         ssl_disabled=bool(db.get("ssl_disabled", 0)),
+        ssh_config=_parse_ssh_config_response(db.get("ssh_config")),
         created_at=datetime.fromisoformat(db["created_at"]),
         updated_at=datetime.fromisoformat(db["updated_at"]),
     )
@@ -259,7 +278,7 @@ async def create_or_update_database(
     """
     try:
         db = await database_manager.create_or_update_database(
-            name, request.url, request.ssl_disabled
+            name, request.url, request.ssl_disabled, request.ssh_config
         )
 
         return DatabaseResponse(
@@ -267,10 +286,18 @@ async def create_or_update_database(
             url=mask_password_in_url(db["url"]),
             db_type=db.get("db_type", "postgresql"),
             ssl_disabled=bool(db.get("ssl_disabled", 0)),
+            ssh_config=_parse_ssh_config_response(db.get("ssh_config")),
             created_at=datetime.fromisoformat(db["created_at"]),
             updated_at=datetime.fromisoformat(db["updated_at"]),
         )
     except ConnectionError as e:
+        # Check if it's an SSH-related error
+        error_msg = str(e)
+        if "SSH" in error_msg or "tunnel" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"SSH connection failed: {e}",
+            ) from e
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(e),

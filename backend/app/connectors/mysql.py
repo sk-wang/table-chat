@@ -25,8 +25,16 @@ class MySQLConnector(DatabaseConnector):
             return "mysql"
         raise ValueError(f"Unsupported database URL: {url}")
 
-    def _parse_url(self, url: str) -> dict[str, Any]:
-        """Parse MySQL connection URL."""
+    def _parse_url(self, url: str, tunnel_endpoint: tuple[str, int] | None = None) -> dict[str, Any]:
+        """Parse MySQL connection URL.
+
+        Args:
+            url: MySQL connection URL
+            tunnel_endpoint: Optional (host, port) tuple to use instead of URL host/port
+
+        Returns:
+            Dictionary with connection parameters
+        """
         from urllib.parse import unquote, urlparse
 
         parsed = urlparse(url)
@@ -37,29 +45,41 @@ class MySQLConnector(DatabaseConnector):
         # unquote password to handle URL-encoded characters like %40 (@), %23 (#)
         password = unquote(parsed.password) if parsed.password else ""
 
+        # Use tunnel endpoint if provided, otherwise use URL host/port
+        if tunnel_endpoint:
+            host, port = tunnel_endpoint
+        else:
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 3306
+
         return {
-            "host": parsed.hostname or "localhost",
-            "port": parsed.port or 3306,
+            "host": host,
+            "port": port,
             "user": parsed.username or "",
             "password": password,
             "database": parsed.path[1:] if parsed.path else "",  # Remove leading /
         }
 
     def _build_connection_params(
-        self, url: str, timeout: int | None = None, ssl_disabled: bool = False
+        self,
+        url: str,
+        timeout: int | None = None,
+        ssl_disabled: bool = False,
+        tunnel_endpoint: tuple[str, int] | None = None,
     ) -> dict[str, Any]:
         """Build MySQL connection parameters.
-        
+
         Args:
             url: MySQL connection URL
             timeout: Optional connection timeout in seconds
             ssl_disabled: Whether to disable SSL
-            
+            tunnel_endpoint: Optional (host, port) tuple if using SSH tunnel
+
         Returns:
             Dictionary of connection parameters for mysql.connector.connect()
         """
-        params = self._parse_url(url)
-        
+        params = self._parse_url(url, tunnel_endpoint)
+
         conn_params: dict[str, Any] = {
             "host": params["host"],
             "port": params["port"],
@@ -67,27 +87,33 @@ class MySQLConnector(DatabaseConnector):
             "password": params["password"],
             "database": params["database"],
         }
-        
+
         if timeout is not None:
             conn_params["connection_timeout"] = timeout
         else:
             conn_params["connection_timeout"] = settings.mysql_connect_timeout
-        
+
         # Disable SSL if requested
         if ssl_disabled:
             conn_params["ssl_disabled"] = True
             # Also disable SSL verification as a fallback for older MySQL connector versions
             conn_params["ssl_verify_cert"] = False
             conn_params["ssl_verify_identity"] = False
-        
+
         return conn_params
 
-    async def test_connection(self, url: str, timeout: int, ssl_disabled: bool = False) -> None:
+    async def test_connection(
+        self, url: str, timeout: int, tunnel_endpoint: tuple[str, int] | None = None
+    ) -> None:
         """Test MySQL connection."""
 
         def _connect() -> MySQLConnection:
             try:
-                conn_params = self._build_connection_params(url, timeout, ssl_disabled)
+                # Get SSL disabled flag from connection manager (if available)
+                # For now, default to False - will be handled by db_manager
+                conn_params = self._build_connection_params(
+                    url, timeout, ssl_disabled=False, tunnel_endpoint=tunnel_endpoint
+                )
                 conn = mysql.connector.connect(**conn_params)
                 conn.close()
                 return conn
@@ -99,7 +125,7 @@ class MySQLConnector(DatabaseConnector):
         await asyncio.to_thread(_connect)
 
     async def fetch_metadata(
-        self, url: str, ssl_disabled: bool = False
+        self, url: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[TableMetadata]]:
         """Fetch MySQL metadata using INFORMATION_SCHEMA."""
 
@@ -107,7 +133,11 @@ class MySQLConnector(DatabaseConnector):
             conn: MySQLConnection | None = None
 
             try:
-                conn_params = self._build_connection_params(url, ssl_disabled=ssl_disabled)
+                # Note: ssl_disabled should be passed from db_manager context
+                # For now, default to False
+                conn_params = self._build_connection_params(
+                    url, ssl_disabled=False, tunnel_endpoint=tunnel_endpoint
+                )
                 conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor()
 
@@ -227,7 +257,7 @@ class MySQLConnector(DatabaseConnector):
         return await asyncio.to_thread(_fetch)
 
     async def execute_query(
-        self, url: str, sql: str, ssl_disabled: bool = False
+        self, url: str, sql: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """Execute MySQL query."""
 
@@ -236,7 +266,11 @@ class MySQLConnector(DatabaseConnector):
             conn: MySQLConnection | None = None
 
             try:
-                conn_params = self._build_connection_params(url, ssl_disabled=ssl_disabled)
+                # Note: ssl_disabled should be passed from db_manager context
+                # For now, default to False
+                conn_params = self._build_connection_params(
+                    url, ssl_disabled=False, tunnel_endpoint=tunnel_endpoint
+                )
                 conn = mysql.connector.connect(**conn_params)
                 cursor = conn.cursor(dictionary=True)
 

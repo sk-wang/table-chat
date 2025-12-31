@@ -15,12 +15,15 @@ class DatabaseConnector(ABC):
     """
 
     @abstractmethod
-    async def test_connection(self, url: str, timeout: int) -> None:
+    async def test_connection(
+        self, url: str, timeout: int, tunnel_endpoint: tuple[str, int] | None = None
+    ) -> None:
         """Test database connection.
 
         Args:
             url: Database connection URL
             timeout: Connection timeout in seconds
+            tunnel_endpoint: Optional (host, port) tuple if using SSH tunnel
 
         Raises:
             ConnectionError: If connection fails
@@ -30,12 +33,13 @@ class DatabaseConnector(ABC):
 
     @abstractmethod
     async def fetch_metadata(
-        self, url: str
+        self, url: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[TableMetadata]]:
         """Fetch database metadata (schemas, tables, columns).
 
         Args:
             url: Database connection URL
+            tunnel_endpoint: Optional (host, port) tuple if using SSH tunnel
 
         Returns:
             Tuple of (schemas, tables)
@@ -47,13 +51,14 @@ class DatabaseConnector(ABC):
 
     @abstractmethod
     async def execute_query(
-        self, url: str, sql: str
+        self, url: str, sql: str, tunnel_endpoint: tuple[str, int] | None = None
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """Execute SQL query and return results.
 
         Args:
             url: Database connection URL
             sql: SQL query to execute
+            tunnel_endpoint: Optional (host, port) tuple if using SSH tunnel
 
         Returns:
             Tuple of (column_names, rows, execution_time_ms)
