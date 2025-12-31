@@ -18,7 +18,7 @@ export function QueryHistorySearch({
   value,
 }: QueryHistorySearchProps) {
   const [inputValue, setInputValue] = useState(value);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Sync with external value
   useEffect(() => {
