@@ -69,8 +69,10 @@ class SSHTunnelManager:
                 raise ValueError("SSH private key is required for key authentication")
             # Import private key
             try:
+                # Normalize line endings: convert \r\n (Windows) and \r (old Mac) to \n (Unix)
+                normalized_key = ssh_config.private_key.replace('\r\n', '\n').replace('\r', '\n')
                 private_key = asyncssh.import_private_key(
-                    ssh_config.private_key, passphrase=ssh_config.key_passphrase
+                    normalized_key, passphrase=ssh_config.key_passphrase
                 )
                 connect_kwargs["client_keys"] = [private_key]
             except Exception as e:

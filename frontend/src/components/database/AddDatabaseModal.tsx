@@ -298,26 +298,25 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
           </Space>
         </Form.Item>
 
-        {/* SSH Configuration - JetBrains IDE Style */}
+        {/* SSH Configuration - JetBrains IDE Style (Theme-aware) */}
         {sshEnabled && (
           <div style={{ 
-            background: '#fafafa', 
-            border: '1px solid #e8e8e8', 
-            borderRadius: 4, 
+            background: 'rgba(255, 255, 255, 0.04)', 
+            border: '1px solid rgba(255, 255, 255, 0.1)', 
+            borderRadius: 6, 
             padding: '12px 16px',
             marginBottom: 16 
           }}>
-            <Text strong style={{ fontSize: 13, color: '#333', display: 'block', marginBottom: 12 }}>
+            <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
               SSH Configuration
             </Text>
             
-            {/* Hidden file input for private key selection */}
+            {/* Hidden file input for private key selection - no accept filter to allow extensionless keys like id_rsa */}
             <input
               ref={fileInputRef}
               type="file"
               style={{ display: 'none' }}
               onChange={handleFileSelect}
-              accept=".pem,.key,*"
             />
 
             {/* SSH Host & Port - Compact Row */}
@@ -358,7 +357,7 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
               />
             </Form.Item>
 
-            <Divider style={{ margin: '12px 0', borderColor: '#e0e0e0' }} />
+            <Divider style={{ margin: '12px 0' }} />
 
             {/* Authentication Type - Compact Radio */}
             <Form.Item
@@ -416,7 +415,6 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
                     style={{ 
                       fontFamily: 'JetBrains Mono, Consolas, monospace', 
                       fontSize: 11,
-                      background: '#fff',
                       resize: 'vertical'
                     }}
                   />
@@ -428,10 +426,7 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
                     icon={<FolderOpenOutlined />}
                     onClick={() => fileInputRef.current?.click()}
                     size="small"
-                    style={{ 
-                      fontSize: 12,
-                      borderColor: '#d9d9d9',
-                    }}
+                    style={{ fontSize: 12 }}
                   >
                     Browse...
                   </Button>
