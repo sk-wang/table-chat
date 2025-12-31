@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, status
 
 from app.models.error import ErrorResponse, SQLErrorResponse
 from app.models.query import (
+    FormatRequest,
+    FormatResponse,
     NaturalQueryRequest,
     NaturalQueryResponse,
     QueryRequest,
@@ -172,5 +174,38 @@ async def natural_language_query(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"LLM generation failed: {e}",
+        ) from e
+
+
+@router.post(
+    "/format",
+    response_model=FormatResponse,
+    responses={
+        400: {"model": ErrorResponse, "description": "SQL formatting failed"},
+    },
+    summary="Format SQL query",
+)
+async def format_sql(request: FormatRequest) -> FormatResponse:
+    """
+    Format SQL query for better readability.
+    
+    - Converts keywords to uppercase
+    - Adds proper indentation
+    - Separates clauses into multiple lines
+    - Preserves comments and string literals
+    """
+    try:
+        dialect = request.dialect or "postgres"
+        formatted = query_service.format_sql(request.sql, dialect)
+        return FormatResponse(formatted=formatted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to format SQL: {e}",
         ) from e
 

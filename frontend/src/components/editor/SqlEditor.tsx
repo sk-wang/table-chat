@@ -8,6 +8,7 @@ interface SqlEditorProps {
   value: string;
   onChange: (value: string) => void;
   onExecute?: () => void;
+  onFormat?: () => void;
   readOnly?: boolean;
 }
 
@@ -15,6 +16,7 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   value,
   onChange,
   onExecute,
+  onFormat,
   readOnly = false,
 }) => {
   const editorRef = useRef<EditorInstance | null>(null);
@@ -22,13 +24,24 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
   const handleEditorDidMount: OnMount = (editorInstance, monacoInstance) => {
     editorRef.current = editorInstance;
 
-    // Add Ctrl+Enter / Cmd+Enter keyboard shortcut
+    // Add Ctrl+Enter / Cmd+Enter keyboard shortcut for execution
     if (onExecute) {
       editorInstance.addCommand(
-        // eslint-disable-next-line no-bitwise
+         
         monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.Enter,
         () => {
           onExecute();
+        }
+      );
+    }
+
+    // Add Shift+Alt+F keyboard shortcut for formatting
+    if (onFormat) {
+      editorInstance.addCommand(
+         
+        monacoInstance.KeyMod.Shift | monacoInstance.KeyMod.Alt | monacoInstance.KeyCode.KeyF,
+        () => {
+          onFormat();
         }
       );
     }

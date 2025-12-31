@@ -58,29 +58,39 @@ export const dataProvider: DataProvider = {
 
   getApiUrl: () => import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888',
 
-  // Optional methods - not implemented for now
+  // ============================================
+  // Required by Refine DataProvider contract
+  // These methods are not directly called in our app but must be implemented
+  // to satisfy the DataProvider interface requirements
+  // ============================================
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMany: async (): Promise<any> => {
+    // Required by Refine DataProvider contract - not used in this app
     throw new Error('getMany not implemented');
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   createMany: async (): Promise<any> => {
+    // Required by Refine DataProvider contract - not used in this app
     throw new Error('createMany not implemented');
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateMany: async (): Promise<any> => {
+    // Required by Refine DataProvider contract - not used in this app
     throw new Error('updateMany not implemented');
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   deleteMany: async (): Promise<any> => {
+    // Required by Refine DataProvider contract - not used in this app
     throw new Error('deleteMany not implemented');
   },
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   custom: async (): Promise<any> => {
+    // Required by Refine DataProvider contract - not used in this app
     throw new Error('custom not implemented');
   },
 };

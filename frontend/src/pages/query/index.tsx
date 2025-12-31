@@ -57,6 +57,7 @@ export const QueryPage: React.FC = () => {
   const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>();
   const [executing, setExecuting] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [formatting, setFormatting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [queryMode, setQueryMode] = useState<QueryMode>('sql');
   const [llmUnavailable, setLlmUnavailable] = useState(false);
@@ -326,6 +327,25 @@ export const QueryPage: React.FC = () => {
     setGeneratedExplanation(null);
   };
 
+  const handleFormat = async () => {
+    if (!sqlQuery.trim()) {
+      return;
+    }
+
+    try {
+      setFormatting(true);
+      const currentDb = databases.find(db => db.name === selectedDatabase);
+      const dialect = currentDb?.dbType === 'mysql' ? 'mysql' : 'postgres';
+      const formatted = await apiClient.formatSql(sqlQuery, dialect);
+      setSqlQuery(formatted);
+      message.success('SQL formatted successfully');
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Failed to format SQL');
+    } finally {
+      setFormatting(false);
+    }
+  };
+
   const handleGenerateSQL = async (prompt: string) => {
     if (!selectedDatabase) {
       message.error('请先选择数据库');
@@ -445,6 +465,7 @@ export const QueryPage: React.FC = () => {
             value={sqlQuery}
             onChange={setSqlQuery}
             onExecute={handleExecute}
+            onFormat={handleFormat}
           />
         </div>
       ),
@@ -555,7 +576,10 @@ export const QueryPage: React.FC = () => {
           selectedDatabase={selectedDatabase}
           onExecute={handleExecute}
           onClear={handleClear}
+          onFormat={handleFormat}
+          sql={sqlQuery}
           executing={executing}
+          formatting={formatting}
           showDatabaseSelector={false}
         />
 

@@ -99,9 +99,29 @@ class QueryService:
             # If parsing fails but it looks safe, allow it (for DESCRIBE/SHOW variants)
             pass
 
+    def format_sql(self, sql: str, dialect: str = "postgres") -> str:
+        """
+        Format SQL query for better readability.
+
+        Args:
+            sql: SQL statement to format
+            dialect: SQL dialect (postgres or mysql)
+
+        Returns:
+            Formatted SQL statement
+
+        Raises:
+            ValueError: If SQL cannot be formatted
+        """
+        try:
+            formatted = sqlglot.transpile(sql, read=dialect, write=dialect, pretty=True)[0]
+            return formatted
+        except Exception as e:
+            raise ValueError(f"Failed to format SQL: {e}") from e
+
     def inject_limit(self, sql: str, parsed: exp.Expression, dialect: str = "postgres") -> tuple[str, bool]:
         """
-        Add LIMIT 1000 if no LIMIT clause exists.
+        Add LIMIT 1000 if no LIMIT clause exists, preserving original format.
 
         Args:
             sql: Original SQL
@@ -115,9 +135,17 @@ class QueryService:
         if parsed.args.get("limit"):
             return sql, False
 
-        # Add LIMIT 1000
-        parsed_with_limit = parsed.limit(1000)
-        modified_sql = parsed_with_limit.sql(dialect=dialect)
+        # Detect if SQL is multiline
+        stripped_sql = sql.rstrip()
+        is_multiline = '\n' in stripped_sql
+
+        if is_multiline:
+            # Multiline format: add LIMIT on new line
+            modified_sql = stripped_sql + '\nLIMIT 1000'
+        else:
+            # Single line format: append LIMIT with space
+            modified_sql = stripped_sql + ' LIMIT 1000'
+
         return modified_sql, True
 
     async def execute_query(

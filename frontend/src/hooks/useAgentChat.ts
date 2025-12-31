@@ -283,13 +283,23 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
     return history.slice(-3);
   }, []);
 
+  // Use refs to avoid dependency issues with callbacks
+  const stateRef = useRef(state);
+  const extractHistoryRef = useRef(extractHistory);
+  
+  // Update refs in useEffect to avoid accessing during render
+  useEffect(() => {
+    stateRef.current = state;
+    extractHistoryRef.current = extractHistory;
+  });
+
   // Send message
   const sendMessage = useCallback(
     async (prompt: string) => {
-      if (!prompt.trim() || !dbName || state.status !== 'idle') return;
+      if (!prompt.trim() || !dbName || stateRef.current.status !== 'idle') return;
 
       // Extract history BEFORE dispatching START (which adds the new user message)
-      const history = extractHistory(state.messages);
+      const history = extractHistoryRef.current(stateRef.current.messages);
 
       dispatch({ type: 'START', prompt: prompt.trim() });
 
@@ -350,7 +360,7 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
         }
       }, TIMEOUT_MS);
     },
-    [dbName, state.status]
+    [dbName]
   );
 
   // Cancel request

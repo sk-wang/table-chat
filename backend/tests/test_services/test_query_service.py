@@ -85,6 +85,79 @@ class TestQueryService:
         assert "OFFSET 20" in modified_sql
         assert truncated is True
 
+    def test_inject_limit_single_line(self):
+        """Test injecting LIMIT for single-line SQL."""
+        sql = "SELECT * FROM users WHERE id > 10"
+        parsed = query_service.parse_sql(sql)
+        modified_sql, truncated = query_service.inject_limit(sql, parsed)
+        
+        assert modified_sql == "SELECT * FROM users WHERE id > 10 LIMIT 1000"
+        assert truncated is True
+
+    def test_inject_limit_multiline(self):
+        """Test injecting LIMIT for multiline SQL preserves format."""
+        sql = "SELECT *\nFROM users\nWHERE id > 10"
+        parsed = query_service.parse_sql(sql)
+        modified_sql, truncated = query_service.inject_limit(sql, parsed)
+        
+        assert modified_sql == "SELECT *\nFROM users\nWHERE id > 10\nLIMIT 1000"
+        assert truncated is True
+
+    def test_inject_limit_trailing_whitespace(self):
+        """Test injecting LIMIT handles trailing whitespace."""
+        sql = "SELECT * FROM users  \n  "
+        parsed = query_service.parse_sql(sql)
+        modified_sql, truncated = query_service.inject_limit(sql, parsed)
+        
+        assert modified_sql == "SELECT * FROM users\nLIMIT 1000"
+        assert truncated is True
+
+
+class TestFormatSql:
+    """Test suite for format_sql method."""
+
+    def test_format_simple_sql(self):
+        """Test formatting simple SQL."""
+        sql = "select * from users where id=1"
+        formatted = query_service.format_sql(sql)
+        
+        assert "SELECT" in formatted
+        assert "FROM" in formatted
+        assert "WHERE" in formatted
+        # Should have proper indentation/newlines
+        assert "\n" in formatted
+
+    def test_format_complex_sql(self):
+        """Test formatting complex SQL with JOIN and subquery."""
+        sql = "select u.name,o.total from users u join orders o on u.id=o.user_id where o.total>100"
+        formatted = query_service.format_sql(sql)
+        
+        assert "SELECT" in formatted
+        assert "JOIN" in formatted
+        assert "ON" in formatted
+        assert "\n" in formatted
+
+    def test_format_invalid_sql(self):
+        """Test formatting invalid SQL raises ValueError."""
+        with pytest.raises(ValueError, match="Failed to format SQL"):
+            query_service.format_sql("This is not SQL!!!")
+
+    def test_format_idempotent(self):
+        """Test formatting is idempotent (multiple formats produce same result)."""
+        sql = "select * from users where id=1"
+        formatted1 = query_service.format_sql(sql)
+        formatted2 = query_service.format_sql(formatted1)
+        
+        assert formatted1 == formatted2
+
+    def test_format_mysql_dialect(self):
+        """Test formatting with MySQL dialect."""
+        sql = "select * from users limit 10"
+        formatted = query_service.format_sql(sql, dialect="mysql")
+        
+        assert "SELECT" in formatted
+        assert "LIMIT" in formatted
+
 
 class TestValidateReadonly:
     """Test suite for validate_readonly method."""

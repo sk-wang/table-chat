@@ -124,6 +124,54 @@ class TestQueryAPIWithMocks:
             assert "Query execution failed" in response.json()["detail"]
 
 
+class TestFormatSQLAPI:
+    """Test SQL formatting endpoint."""
+
+    def test_format_sql_success(self, test_client):
+        """Test successfully formatting SQL."""
+        response = test_client.post(
+            "/api/v1/dbs/format",
+            json={"sql": "select * from users where id=1"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "formatted" in data
+        # The formatted SQL should have proper structure
+        assert "SELECT" in data["formatted"]
+        assert "FROM" in data["formatted"]
+
+    def test_format_sql_with_dialect(self, test_client):
+        """Test formatting SQL with specific dialect."""
+        response = test_client.post(
+            "/api/v1/dbs/format",
+            json={"sql": "select * from users", "dialect": "mysql"}
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "formatted" in data
+
+    def test_format_sql_invalid(self, test_client):
+        """Test formatting invalid SQL returns error."""
+        response = test_client.post(
+            "/api/v1/dbs/format",
+            json={"sql": "This is not SQL at all!!!"}
+        )
+
+        assert response.status_code == 400
+        assert "detail" in response.json()
+
+    def test_format_sql_empty(self, test_client):
+        """Test formatting empty SQL."""
+        response = test_client.post(
+            "/api/v1/dbs/format",
+            json={"sql": ""}
+        )
+        # Empty SQL should fail validation or formatting
+        assert response.status_code in [400, 422]
+
+
 class TestNaturalQueryAPI:
     """Test natural language query endpoint."""
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Space, Select, Typography } from 'antd';
-import { PlayCircleOutlined, ClearOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, ClearOutlined, FormatPainterOutlined } from '@ant-design/icons';
 import type { DatabaseResponse } from '../../types';
 
 const { Text } = Typography;
@@ -11,7 +11,10 @@ interface QueryToolbarProps {
   onDatabaseChange?: (dbName: string) => void;
   onExecute: () => void;
   onClear: () => void;
+  onFormat?: () => void;
+  sql?: string;
   executing?: boolean;
+  formatting?: boolean;
   disabled?: boolean;
   showDatabaseSelector?: boolean;
 }
@@ -22,7 +25,10 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
   onDatabaseChange,
   onExecute,
   onClear,
+  onFormat,
+  sql,
   executing = false,
+  formatting = false,
   disabled = false,
   showDatabaseSelector = true,
 }) => {
@@ -53,6 +59,17 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
       </Space>
 
       <Space>
+        {onFormat && (
+          <Button
+            icon={<FormatPainterOutlined />}
+            onClick={onFormat}
+            loading={formatting}
+            disabled={disabled || !sql}
+            style={{ background: '#3c3f41', borderColor: '#323232', color: '#a9b7c6' }}
+          >
+            Format
+          </Button>
+        )}
         <Button
           icon={<ClearOutlined />}
           onClick={onClear}

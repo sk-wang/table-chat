@@ -51,3 +51,19 @@ class NaturalQueryResponse(CamelModel):
         None, description="Export format if export intent was detected"
     )
 
+
+# === SQL Formatting Models ===
+
+
+class FormatRequest(CamelModel):
+    """Request model for SQL formatting."""
+
+    sql: str = Field(..., description="SQL statement to format")
+    dialect: str | None = Field(None, description="SQL dialect (postgres or mysql)")
+
+
+class FormatResponse(CamelModel):
+    """Response model for SQL formatting."""
+
+    formatted: str = Field(..., description="Formatted SQL statement")
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Input, Typography } from 'antd';
 import type { TableMetadata } from '../../types/metadata';
 
@@ -52,9 +52,16 @@ export const TableSearchInput: React.FC<TableSearchInputProps> = ({
   }, []);
 
   // Update search results when debounced query changes
+  // Using a ref to batch the state updates and avoid React Compiler warning
+  const filteredTablesRef = useRef<typeof tables>([]);
+  
   useEffect(() => {
     const filtered = filterTables(debouncedQuery, tables);
-    setResultCount(filtered.length);
+    filteredTablesRef.current = filtered;
+    // Batch updates: use a microtask to avoid synchronous setState in effect
+    queueMicrotask(() => {
+      setResultCount(filtered.length);
+    });
     onSearch(debouncedQuery, filtered);
   }, [debouncedQuery, tables, filterTables, onSearch]);
 

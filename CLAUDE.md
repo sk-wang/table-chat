@@ -17,6 +17,7 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - SQLite (via Docker Volume 持久化) (012-docker-setup)
 - TypeScript 5.x + React, Ant Design, 浏览器 File API (014-ssh-key-file-picker)
 - N/A（前端文件读取，不涉及持久化） (014-ssh-key-file-picker)
+- TypeScript 5.x (前端), Python 3.13+ (后端) + React, Monaco Editor, sqlglot, sql-formatter (015-sql-formatter)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -36,9 +37,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 015-sql-formatter: Added TypeScript 5.x (前端), Python 3.13+ (后端) + React, Monaco Editor, sqlglot, sql-formatter
 - 014-ssh-key-file-picker: Added TypeScript 5.x + React, Ant Design, 浏览器 File API
 - 012-docker-setup: Added Python 3.13+ (backend), Node.js 22 (frontend build) + Docker, Docker Compose V2, Nginx (frontend serving), uvicorn (backend)
-- 008-resizable-query-panel: Added TypeScript 5.9+ (Vite + React 19) + React, Ant Design, react-resizable (已安装)
 
 
 <!-- MANUAL ADDITIONS START -->

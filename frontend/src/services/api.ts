@@ -98,6 +98,18 @@ class ApiClient {
     }
   }
 
+  async formatSql(sql: string, dialect?: string): Promise<string> {
+    try {
+      const response: AxiosResponse<{ formatted: string }> = await this.client.post(
+        '/dbs/format',
+        { sql, dialect }
+      );
+      return response.data.formatted;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
   async naturalLanguageQuery(
     dbName: string,
     data: NaturalQueryRequest

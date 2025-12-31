@@ -20,28 +20,30 @@ const MAX_WIDTH = 800;
 const DEFAULT_WIDTH = 420;
 const COLLAPSED_WIDTH = 48;
 
+// Helper function to get initial width from localStorage
+const getInitialWidth = (): number => {
+  if (typeof window === 'undefined') return DEFAULT_WIDTH;
+  const savedWidth = localStorage.getItem('agent_sidebar_width');
+  if (savedWidth) {
+    const parsed = parseInt(savedWidth, 10);
+    if (parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
+      return parsed;
+    }
+  }
+  return DEFAULT_WIDTH;
+};
+
 export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   dbName,
   disabled = false,
   onSQLGenerated,
 }) => {
   const [collapsed, setCollapsed] = useState(true);
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const [width, setWidth] = useState(getInitialWidth);
   const [isResizing, setIsResizing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
-
-  // Load saved width from localStorage
-  useEffect(() => {
-    const savedWidth = localStorage.getItem('agent_sidebar_width');
-    if (savedWidth) {
-      const parsed = parseInt(savedWidth, 10);
-      if (parsed >= MIN_WIDTH && parsed <= MAX_WIDTH) {
-        setWidth(parsed);
-      }
-    }
-  }, []);
 
   // Save width to localStorage
   useEffect(() => {

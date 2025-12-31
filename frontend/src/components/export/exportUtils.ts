@@ -191,7 +191,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
  */
 function sanitizeFilename(name: string): string {
   // 替换特殊字符为下划线
-  return name.replace(/[\/\\:*?"<>|\s]/g, '_');
+  return name.replace(/[/\\:*?"<>|\s]/g, '_');
 }
 
 /**

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 
@@ -18,6 +18,7 @@ export function QueryHistorySearch({
   value,
 }: QueryHistorySearchProps) {
   const [inputValue, setInputValue] = useState(value);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Sync with external value
   useEffect(() => {
@@ -26,19 +27,18 @@ export function QueryHistorySearch({
 
   // Debounced search
   const debouncedSearch = useCallback(
-    (() => {
-      let timeoutId: ReturnType<typeof setTimeout>;
-      return (query: string) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          if (query.trim()) {
-            onSearch(query);
-          } else {
-            onClear();
-          }
-        }, 300);
-      };
-    })(),
+    (query: string) => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      timeoutRef.current = setTimeout(() => {
+        if (query.trim()) {
+          onSearch(query);
+        } else {
+          onClear();
+        }
+      }, 300);
+    },
     [onSearch, onClear]
   );
 
