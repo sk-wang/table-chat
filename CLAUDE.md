@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - localStorage (browser) (008-resizable-query-panel)
 - Python 3.13+ (backend), Node.js 22 (frontend build) + Docker, Docker Compose V2, Nginx (frontend serving), uvicorn (backend) (012-docker-setup)
 - SQLite (via Docker Volume 持久化) (012-docker-setup)
+- TypeScript 5.x + React, Ant Design, 浏览器 File API (014-ssh-key-file-picker)
+- N/A（前端文件读取，不涉及持久化） (014-ssh-key-file-picker)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -34,9 +36,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 014-ssh-key-file-picker: Added TypeScript 5.x + React, Ant Design, 浏览器 File API
 - 012-docker-setup: Added Python 3.13+ (backend), Node.js 22 (frontend build) + Docker, Docker Compose V2, Nginx (frontend serving), uvicorn (backend)
 - 008-resizable-query-panel: Added TypeScript 5.9+ (Vite + React 19) + React, Ant Design, react-resizable (已安装)
-- 007-localstorage-cache: Added TypeScript 5.x + React 18+, Ant Design 5.x
 
 
 <!-- MANUAL ADDITIONS START -->

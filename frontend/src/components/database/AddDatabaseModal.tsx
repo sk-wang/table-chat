@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, Form, Input, Radio, Space, Typography, Checkbox, App, Collapse, Switch } from 'antd';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Modal, Form, Input, Radio, Space, Typography, Checkbox, App, Switch, Button, Divider } from 'antd';
+import { FolderOpenOutlined } from '@ant-design/icons';
 import type { DatabaseResponse, SSHConfig } from '../../types';
 import { apiClient } from '../../services/api';
+import { readFileAsText } from '../../utils/fileReader';
 
 const { Text } = Typography;
-const { Panel } = Collapse;
 
 interface AddDatabaseModalProps {
   open: boolean;
@@ -49,6 +50,27 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
   const [dbType, setDbType] = useState<DbType>('postgresql');
   const [sshEnabled, setSshEnabled] = useState(false);
   const [sshAuthType, setSshAuthType] = useState<'password' | 'key'>('password');
+  
+  // File input ref for private key file picker
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Handle private key file selection
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    const result = await readFileAsText(file);
+    
+    if (result.success) {
+      form.setFieldValue('sshPrivateKey', result.content);
+      message.success(`已加载: ${file.name}`);
+    } else {
+      message.error(result.error.message);
+    }
+    
+    // Reset input to allow re-selecting the same file
+    event.target.value = '';
+  };
 
   // Get current database type config
   const dbConfig = useMemo(() => DB_TYPES[dbType], [dbType]);
@@ -276,155 +298,167 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
           </Space>
         </Form.Item>
 
+        {/* SSH Configuration - JetBrains IDE Style */}
         {sshEnabled && (
-          <Collapse
-            defaultActiveKey={['ssh']}
-            style={{ marginBottom: 16 }}
-            bordered={false}
-          >
-            <Panel header="SSH Configuration" key="ssh">
-              {/* SSH Host */}
+          <div style={{ 
+            background: '#fafafa', 
+            border: '1px solid #e8e8e8', 
+            borderRadius: 4, 
+            padding: '12px 16px',
+            marginBottom: 16 
+          }}>
+            <Text strong style={{ fontSize: 13, color: '#333', display: 'block', marginBottom: 12 }}>
+              SSH Configuration
+            </Text>
+            
+            {/* Hidden file input for private key selection */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={handleFileSelect}
+              accept=".pem,.key,*"
+            />
+
+            {/* SSH Host & Port - Compact Row */}
+            <Space.Compact style={{ width: '100%', marginBottom: 8 }}>
               <Form.Item
                 name="sshHost"
-                label="SSH Host"
-                rules={[
-                  { required: sshEnabled, message: 'Please enter SSH host' },
-                ]}
+                rules={[{ required: sshEnabled, message: 'Host required' }]}
+                style={{ marginBottom: 0, flex: 1 }}
               >
-                <Input placeholder="example.com or 192.168.1.1" />
+                <Input 
+                  placeholder="SSH Host (e.g., bastion.example.com)" 
+                  style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                />
               </Form.Item>
-
-              {/* SSH Port */}
               <Form.Item
                 name="sshPort"
-                label="SSH Port"
                 initialValue={22}
-                rules={[
-                  { required: sshEnabled, message: 'Please enter SSH port' },
-                  {
-                    type: 'number',
-                    min: 1,
-                    max: 65535,
-                    message: 'Port must be between 1 and 65535',
-                    transform: (value) => Number(value),
-                  },
-                ]}
+                rules={[{ required: sshEnabled, message: 'Port' }]}
+                style={{ marginBottom: 0, width: 80 }}
               >
-                <Input type="number" placeholder="22" />
+                <Input 
+                  type="number" 
+                  placeholder="22" 
+                  style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                />
               </Form.Item>
+            </Space.Compact>
 
-              {/* SSH Username */}
-              <Form.Item
-                name="sshUsername"
-                label="SSH Username"
-                rules={[
-                  { required: sshEnabled, message: 'Please enter SSH username' },
-                ]}
-              >
-                <Input placeholder="root or your-username" />
-              </Form.Item>
+            {/* SSH Username */}
+            <Form.Item
+              name="sshUsername"
+              rules={[{ required: sshEnabled, message: 'Username required' }]}
+              style={{ marginBottom: 8 }}
+            >
+              <Input 
+                placeholder="Username (e.g., root)" 
+                style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+              />
+            </Form.Item>
 
-              {/* Authentication Type Selector */}
-              <Form.Item
-                name="sshAuthType"
-                label="Authentication Type"
-                initialValue="password"
-              >
-                <Radio.Group
-                  value={sshAuthType}
-                  onChange={(e) => {
-                    setSshAuthType(e.target.value);
-                    // Clear opposite auth fields when switching
-                    if (e.target.value === 'password') {
-                      form.setFieldsValue({
-                        sshPrivateKey: undefined,
-                        sshKeyPassphrase: undefined,
-                      });
-                    } else {
-                      form.setFieldsValue({
-                        sshPassword: undefined,
-                      });
-                    }
-                  }}
-                >
-                  <Radio.Button value="password">Password</Radio.Button>
-                  <Radio.Button value="key">Private Key</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
+            <Divider style={{ margin: '12px 0', borderColor: '#e0e0e0' }} />
 
-              {/* Password Authentication */}
-              {sshAuthType === 'password' && (
-                <Form.Item
-                  name="sshPassword"
-                  label="SSH Password"
-                  rules={[
-                    {
-                      required: sshEnabled && sshAuthType === 'password',
-                      message: 'Please enter SSH password',
-                    },
-                  ]}
-                  extra={
-                    editingDatabase && (
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        Leave empty to keep existing password
-                      </Text>
-                    )
+            {/* Authentication Type - Compact Radio */}
+            <Form.Item
+              name="sshAuthType"
+              initialValue="password"
+              style={{ marginBottom: 8 }}
+            >
+              <Radio.Group
+                value={sshAuthType}
+                onChange={(e) => {
+                  setSshAuthType(e.target.value);
+                  if (e.target.value === 'password') {
+                    form.setFieldsValue({ sshPrivateKey: undefined, sshKeyPassphrase: undefined });
+                  } else {
+                    form.setFieldsValue({ sshPassword: undefined });
                   }
+                }}
+                size="small"
+              >
+                <Radio value="password">Password</Radio>
+                <Radio value="key">Key pair (OpenSSH or PuTTY)</Radio>
+              </Radio.Group>
+            </Form.Item>
+
+            {/* Password Authentication */}
+            {sshAuthType === 'password' && (
+              <Form.Item
+                name="sshPassword"
+                rules={[
+                  { required: sshEnabled && sshAuthType === 'password', message: 'Password required' },
+                ]}
+                style={{ marginBottom: 0 }}
+              >
+                <Input.Password 
+                  placeholder="SSH Password" 
+                  style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                />
+              </Form.Item>
+            )}
+
+            {/* Private Key Authentication - JetBrains Style */}
+            {sshAuthType === 'key' && (
+              <>
+                {/* Private Key Path/Content with Browse Button */}
+                <Form.Item
+                  name="sshPrivateKey"
+                  rules={[
+                    { required: sshEnabled && sshAuthType === 'key', message: 'Private key required' },
+                  ]}
+                  style={{ marginBottom: 8 }}
                 >
-                  <Input.Password placeholder="Your SSH password" />
+                  <Input.TextArea
+                    rows={5}
+                    placeholder="Paste private key content or click Browse to select file...&#10;-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+                    style={{ 
+                      fontFamily: 'JetBrains Mono, Consolas, monospace', 
+                      fontSize: 11,
+                      background: '#fff',
+                      resize: 'vertical'
+                    }}
+                  />
                 </Form.Item>
-              )}
-
-              {/* Private Key Authentication */}
-              {sshAuthType === 'key' && (
-                <>
-                  <Form.Item
-                    name="sshPrivateKey"
-                    label="Private Key"
-                    rules={[
-                      {
-                        required: sshEnabled && sshAuthType === 'key',
-                        message: 'Please enter private key',
-                      },
-                    ]}
-                    extra={
-                      <Space direction="vertical" size={0}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Paste your private key content (OpenSSH or PEM format)
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Example: -----BEGIN RSA PRIVATE KEY----- ...
-                        </Text>
-                        {editingDatabase && (
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            Leave empty to keep existing private key
-                          </Text>
-                        )}
-                      </Space>
-                    }
+                
+                {/* Browse Button - JetBrains Style */}
+                <div style={{ marginBottom: 12 }}>
+                  <Button
+                    icon={<FolderOpenOutlined />}
+                    onClick={() => fileInputRef.current?.click()}
+                    size="small"
+                    style={{ 
+                      fontSize: 12,
+                      borderColor: '#d9d9d9',
+                    }}
                   >
-                    <Input.TextArea
-                      rows={6}
-                      placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
-                      style={{ fontFamily: 'monospace', fontSize: 12 }}
-                    />
-                  </Form.Item>
+                    Browse...
+                  </Button>
+                  <Text type="secondary" style={{ fontSize: 11, marginLeft: 8 }}>
+                    Select private key file (.pem, id_rsa, id_ed25519)
+                  </Text>
+                </div>
 
-                  <Form.Item
-                    name="sshKeyPassphrase"
-                    label="Key Passphrase (Optional)"
-                    extra={
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        Only required if your private key is encrypted
-                      </Text>
-                    }
-                  >
-                    <Input.Password placeholder="Leave empty if key has no passphrase" />
-                  </Form.Item>
-                </>
-              )}
-            </Panel>
-          </Collapse>
+                {/* Key Passphrase */}
+                <Form.Item
+                  name="sshKeyPassphrase"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Input.Password 
+                    placeholder="Passphrase (leave empty if none)" 
+                    style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}
+                  />
+                </Form.Item>
+                
+                {editingDatabase && (
+                  <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>
+                    Leave empty to keep existing key
+                  </Text>
+                )}
+              </>
+            )}
+          </div>
         )}
       </Form>
     </Modal>
