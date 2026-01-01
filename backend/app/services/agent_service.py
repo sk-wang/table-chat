@@ -1,6 +1,7 @@
 """Agent service using Anthropic Python client with Tool Use."""
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -207,22 +208,51 @@ class AgentService:
                 # Process the final message
                 assistant_content = []
                 has_tool_use = False
+                fallback_tool_calls = []  # Tool calls extracted from text
 
                 for block in final_message.content:
                     if block.type == "text":
-                        assistant_content.append({"type": "text", "text": block.text})
-                        # Check if this contains final SQL
-                        sql = self._extract_sql(block.text)
-                        if sql:
-                            yield {
-                                "event": "sql",
-                                "data": {"sql": sql, "explanation": block.text},
-                            }
+                        # Check for text-format tool calls (fallback for non-Claude models)
+                        text_tool_calls = self._extract_text_tool_calls(block.text)
+                        if text_tool_calls:
+                            # Found text-format tool calls, treat them as real tool calls
+                            logger.info(f"Using fallback text-format tool calls: {len(text_tool_calls)}")
+                            fallback_tool_calls.extend(text_tool_calls)
+                            has_tool_use = True
+                            # Add the text content (without tool call markers)
+                            clean_text = re.sub(
+                                r'\[Tool:\s*\w+\s*\(ID:[^)]+\)\]\s*(?:Input|Arguments):\s*\{[^}]*\}',
+                                '',
+                                block.text
+                            ).strip()
+                            if clean_text:
+                                assistant_content.append({"type": "text", "text": clean_text})
+                                yield {
+                                    "event": "message",
+                                    "data": {"role": "assistant", "content": clean_text},
+                                }
+                            # Add synthetic tool_use blocks to assistant_content
+                            for tc in text_tool_calls:
+                                assistant_content.append({
+                                    "type": "tool_use",
+                                    "id": tc["id"],
+                                    "name": tc["name"],
+                                    "input": tc["input"],
+                                })
                         else:
-                            yield {
-                                "event": "message",
-                                "data": {"role": "assistant", "content": block.text},
-                            }
+                            assistant_content.append({"type": "text", "text": block.text})
+                            # Check if this contains final SQL
+                            sql = self._extract_sql(block.text)
+                            if sql:
+                                yield {
+                                    "event": "sql",
+                                    "data": {"sql": sql, "explanation": block.text},
+                                }
+                            else:
+                                yield {
+                                    "event": "message",
+                                    "data": {"role": "assistant", "content": block.text},
+                                }
                     elif block.type == "tool_use":
                         has_tool_use = True
                         assistant_content.append({
@@ -242,51 +272,67 @@ class AgentService:
 
                 # Execute tools and collect results
                 tool_results = []
+
+                # Collect tool calls from both real tool_use blocks and fallback text parsing
+                tools_to_execute = []
+
+                # First, add real tool_use blocks
                 for block in final_message.content:
                     if block.type == "tool_use":
-                        tool_calls_count += 1
-                        tool_name = block.name
-                        tool_input = block.input
-                        tool_id = block.id
-
-                        logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
-
-                        # Update tool call status
-                        yield {
-                            "event": "tool_call",
-                            "data": {
-                                "id": tool_id,
-                                "tool": tool_name,
-                                "input": tool_input,
-                                "status": "running",
-                            },
-                        }
-
-                        # Execute tool
-                        tool_start = time.time()
-                        result = await execute_tool(db_name, tool_name, tool_input)
-                        tool_duration = int((time.time() - tool_start) * 1000)
-
-                        logger.info(f"Tool {tool_name} completed in {tool_duration}ms")
-
-                        # Emit tool result
-                        yield {
-                            "event": "tool_call",
-                            "data": {
-                                "id": tool_id,
-                                "tool": tool_name,
-                                "input": tool_input,
-                                "status": "completed",
-                                "output": result[:1000] if len(result) > 1000 else result,
-                                "duration_ms": tool_duration,
-                            },
-                        }
-
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_id,
-                            "content": result,
+                        tools_to_execute.append({
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
                         })
+
+                # Then, add fallback tool calls (if any)
+                if fallback_tool_calls:
+                    tools_to_execute.extend(fallback_tool_calls)
+
+                for tool_call in tools_to_execute:
+                    tool_calls_count += 1
+                    tool_name = tool_call["name"]
+                    tool_input = tool_call["input"]
+                    tool_id = tool_call["id"]
+
+                    logger.info(f"Executing tool: {tool_name} with input: {tool_input}")
+
+                    # Update tool call status
+                    yield {
+                        "event": "tool_call",
+                        "data": {
+                            "id": tool_id,
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "status": "running",
+                        },
+                    }
+
+                    # Execute tool
+                    tool_start = time.time()
+                    result = await execute_tool(db_name, tool_name, tool_input)
+                    tool_duration = int((time.time() - tool_start) * 1000)
+
+                    logger.info(f"Tool {tool_name} completed in {tool_duration}ms")
+
+                    # Emit tool result
+                    yield {
+                        "event": "tool_call",
+                        "data": {
+                            "id": tool_id,
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "status": "completed",
+                            "output": result[:1000] if len(result) > 1000 else result,
+                            "duration_ms": tool_duration,
+                        },
+                    }
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": result,
+                    })
 
                 # Add tool results to conversation
                 messages.append({"role": "user", "content": tool_results})
@@ -347,6 +393,72 @@ class AgentService:
                 return code
 
         return None
+
+    def _extract_text_tool_calls(self, text: str) -> list[dict[str, Any]]:
+        """
+        Extract tool calls from text format (fallback for non-Claude models).
+
+        Parses patterns like:
+        [Tool: query_database (ID: query_database:1)]
+        Input: {"sql": "SELECT ..."}
+
+        or:
+        Tool: query_database
+        Arguments: {"sql": "SELECT ..."}
+        """
+        tool_calls = []
+
+        # Pattern 1: [Tool: name (ID: id)]
+        # Input: {...}
+        pattern1 = re.compile(
+            r'\[Tool:\s*(\w+)\s*\(ID:\s*([^)]+)\)\]\s*'
+            r'(?:Input|Arguments):\s*(\{[^}]*\}|\{[\s\S]*?\})',
+            re.MULTILINE
+        )
+
+        for match in pattern1.finditer(text):
+            tool_name = match.group(1)
+            tool_id = match.group(2)
+            try:
+                tool_input = json.loads(match.group(3))
+            except json.JSONDecodeError:
+                # Try to fix common JSON issues
+                input_str = match.group(3).replace("'", '"')
+                try:
+                    tool_input = json.loads(input_str)
+                except json.JSONDecodeError:
+                    tool_input = {"raw": match.group(3)}
+
+            tool_calls.append({
+                "id": tool_id,
+                "name": tool_name,
+                "input": tool_input,
+            })
+
+        # Pattern 2: Tool: name
+        # Arguments: {...}
+        if not tool_calls:
+            pattern2 = re.compile(
+                r'Tool:\s*(\w+)\s*\n\s*Arguments:\s*(\{[\s\S]*?\})',
+                re.MULTILINE
+            )
+            for i, match in enumerate(pattern2.finditer(text)):
+                tool_name = match.group(1)
+                try:
+                    tool_input = json.loads(match.group(2))
+                except json.JSONDecodeError:
+                    tool_input = {"raw": match.group(2)}
+
+                tool_calls.append({
+                    "id": f"{tool_name}:{i}",
+                    "name": tool_name,
+                    "input": tool_input,
+                })
+
+        if tool_calls:
+            logger.info(f"Extracted {len(tool_calls)} tool calls from text: {[tc['name'] for tc in tool_calls]}")
+
+        return tool_calls
 
     def cancel_task(self, _db_name: str) -> bool:
         """Cancel an active agent task for a database."""

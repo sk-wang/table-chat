@@ -16,10 +16,11 @@ services:
       - .env
     environment:
       # 上游服务配置
-      - ANTHROPIC_API_KEY=${LUPSTREAM_API_KEY:-${LLM_API_KEY}}
-       - ANTHROPIC_API_BASE=${UPSTREAM_API_BASE:-https://api.anthropic.com}
+      - ANTHROPIC_API_KEY=${UPSTREAM_API_KEY:-${LLM_API_KEY}}
+      - ANTHROPIC_API_BASE=${UPSTREAM_API_BASE:-https://api.anthropic.com}
       - OPENAI_API_KEY=${UPSTREAM_API_KEY:-${LLM_API_KEY}}
-      - OPENAI_API_BASE=${UPSTREAM_API_BASE:-https://api.openai.com/v1}
+      # 注意：claude-code-proxy 使用 OPENAI_BASE_URL 而不是 OPENAI_API_BASE
+      - OPENAI_BASE_URL=${UPSTREAM_API_BASE:-https://api.openai.com/v1}
       # 代理行为配置
       - PREFERRED_PROVIDER=${UPSTREAM_API_TYPE:-anthropic}
       - BIG_MODEL=${LLM_MODEL:-claude-sonnet-4-5-20250929}
