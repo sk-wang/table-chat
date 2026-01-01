@@ -37,9 +37,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 017-llm-think-tag-support: Added Python 3.13+ (uv 管理) + FastAPI, OpenAI SDK, Pydantic
 - 015-sql-formatter: Added TypeScript 5.x (前端), Python 3.13+ (后端) + React, Monaco Editor, sqlglot, sql-formatter
 - 014-ssh-key-file-picker: Added TypeScript 5.x + React, Ant Design, 浏览器 File API
-- 012-docker-setup: Added Python 3.13+ (backend), Node.js 22 (frontend build) + Docker, Docker Compose V2, Nginx (frontend serving), uvicorn (backend)
 
 
 <!-- MANUAL ADDITIONS START -->

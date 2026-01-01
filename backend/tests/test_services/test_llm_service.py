@@ -9,7 +9,83 @@ from app.services.llm_service import (
     TABLE_SELECTION_THRESHOLD,
     MAX_SELECTED_TABLES,
     PHASE1_MAX_TOKENS,
+    strip_think_tags,
 )
+
+
+class TestStripThinkTags:
+    """Test suite for strip_think_tags helper function."""
+
+    def test_strip_think_tags_removes_think_block(self):
+        """Test that <think>...</think> block is removed from the beginning."""
+        content = '<think>这是思考过程...</think>{"sql": "SELECT 1"}'
+        result = strip_think_tags(content)
+        assert result == '{"sql": "SELECT 1"}'
+
+    def test_strip_think_tags_with_leading_whitespace(self):
+        """Test that leading whitespace before <think> is handled."""
+        content = '  \n<think>思考过程</think>{"sql": "SELECT 1"}'
+        result = strip_think_tags(content)
+        assert result == '{"sql": "SELECT 1"}'
+
+    def test_strip_think_tags_with_multiline_content(self):
+        """Test strip_think_tags handles multiline think content."""
+        content = """<think>用户现在需要根据请求"报价全国不统一的测试项目"生成SQL查询。
+
+首先分析需求：要找的是测试项目的报价，全国不统一。
+现在构建JSON对象。</think>
+{"sql": "SELECT * FROM test", "explanation": "test"}"""
+        result = strip_think_tags(content)
+        assert result.strip().startswith('{"sql":')
+        assert "<think>" not in result
+
+    def test_strip_think_tags_with_markdown_json(self):
+        """Test strip_think_tags with think tags followed by markdown code block."""
+        content = """<think>推理过程...</think>
+```json
+{"sql": "SELECT * FROM users", "explanation": "查询用户"}
+```"""
+        result = strip_think_tags(content)
+        assert result.strip().startswith("```json")
+        assert "<think>" not in result
+
+    def test_strip_think_tags_preserves_content_without_tags(self):
+        """Test strip_think_tags returns original content when no think tags."""
+        content = '{"sql": "SELECT 1", "explanation": "test"}'
+        result = strip_think_tags(content)
+        assert result == content
+
+    def test_strip_think_tags_preserves_markdown_without_tags(self):
+        """Test strip_think_tags preserves markdown code block without think tags."""
+        content = '```json\n{"sql": "SELECT 1"}\n```'
+        result = strip_think_tags(content)
+        assert result == content
+
+    def test_strip_think_tags_only_removes_first_block(self):
+        """Test strip_think_tags only removes the first <think> block."""
+        content = '<think>first</think><think>second</think>{"sql": "SELECT 1"}'
+        result = strip_think_tags(content)
+        assert result == '<think>second</think>{"sql": "SELECT 1"}'
+
+    def test_strip_think_tags_unclosed_tag_raises_error(self):
+        """Test strip_think_tags raises error for truncated output (unclosed <think> tag)."""
+        content = '<think>未闭合的思考标签，模型输出被截断了...'
+        with pytest.raises(ValueError, match="truncated"):
+            strip_think_tags(content)
+
+    def test_strip_think_tags_with_json_in_think_block(self):
+        """Test strip_think_tags correctly handles JSON-like content inside think block."""
+        content = '<think>比如: {"key": "value"} 这是示例</think>{"sql": "SELECT 1"}'
+        result = strip_think_tags(content)
+        assert result == '{"sql": "SELECT 1"}'
+
+    def test_strip_think_tags_very_long_think_content(self):
+        """Test strip_think_tags handles very long think content."""
+        long_reasoning = "这是很长的推理过程。" * 1000  # ~10KB of content
+        content = f'<think>{long_reasoning}</think>{{"sql": "SELECT 1"}}'
+        result = strip_think_tags(content)
+        assert result == '{"sql": "SELECT 1"}'
+        assert "<think>" not in result
 
 
 class TestLLMService:
@@ -125,10 +201,11 @@ class TestLLMService:
             mock_client.chat.completions.create.return_value = mock_response
             service._client = mock_client
 
-            sql, explanation = await service.generate_sql("testdb", "查询所有用户")
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询所有用户")
 
             assert sql == "SELECT * FROM users"
             assert explanation == "查询所有用户"
+            assert export_format is None
 
     @pytest.mark.asyncio
     async def test_generate_sql_handles_markdown_code_block(self, service):
@@ -148,7 +225,7 @@ class TestLLMService:
             mock_client.chat.completions.create.return_value = mock_response
             service._client = mock_client
 
-            sql, explanation = await service.generate_sql("testdb", "test")
+            sql, explanation, export_format = await service.generate_sql("testdb", "test")
 
             assert sql == "SELECT 1"
 
@@ -168,10 +245,11 @@ class TestLLMService:
             mock_client.chat.completions.create.return_value = mock_response
             service._client = mock_client
 
-            sql, explanation = await service.generate_sql("testdb", "查询用户1")
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1")
 
             assert sql == "SELECT * FROM users WHERE id = 1"
             assert explanation is None
+            assert export_format is None
 
     @pytest.mark.asyncio
     async def test_generate_sql_rejects_non_select(self, service):
@@ -242,7 +320,7 @@ class TestLLMService:
             service._client = mock_client
 
             # Call with mysql dialect
-            sql, explanation = await service.generate_sql("testdb", "查询用户1", db_type="mysql")
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1", db_type="mysql")
 
             assert sql == "SELECT * FROM `users` WHERE `id` = 1"
             assert explanation == "查询用户1"
@@ -273,7 +351,7 @@ class TestLLMService:
             service._client = mock_client
 
             # Call with postgresql dialect (default)
-            sql, explanation = await service.generate_sql("testdb", "查询用户1", db_type="postgresql")
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1", db_type="postgresql")
 
             assert sql == "SELECT * FROM public.users WHERE id = 1"
             assert explanation == "查询用户1"
@@ -283,6 +361,52 @@ class TestLLMService:
             messages = call_args.kwargs.get("messages", [])
             system_message = messages[0]["content"] if messages else ""
             assert "PostgreSQL" in system_message
+
+    @pytest.mark.asyncio
+    async def test_generate_sql_handles_think_tags_with_json(self, service):
+        """Test generate_sql strips <think> tags before parsing JSON."""
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='<think>用户需要查询用户表...</think>{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
+                )
+            )
+        ]
+
+        with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_schema.return_value = "Schema info"
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询所有用户")
+
+            assert sql == "SELECT * FROM users"
+            assert explanation == "查询所有用户"
+
+    @pytest.mark.asyncio
+    async def test_generate_sql_handles_think_tags_with_markdown(self, service):
+        """Test generate_sql strips <think> tags followed by markdown code block."""
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='<think>分析需求...\n构建JSON。</think>\n```json\n{"sql": "SELECT id FROM users", "explanation": "查询用户ID"}\n```'
+                )
+            )
+        ]
+
+        with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
+             patch.object(service, "_client", create=True) as mock_client:
+            mock_schema.return_value = "Schema info"
+            mock_client.chat.completions.create.return_value = mock_response
+            service._client = mock_client
+
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询用户ID")
+
+            assert sql == "SELECT id FROM users"
+            assert explanation == "查询用户ID"
 
 
 class TestPromptChain:
@@ -558,7 +682,7 @@ class TestPromptChain:
             mock_client.chat.completions.create.side_effect = [phase1_response, phase2_response]
             service._client = mock_client
 
-            sql, explanation = await service.generate_sql("testdb", "查询t1数据")
+            sql, explanation, export_format = await service.generate_sql("testdb", "查询t1数据")
 
             assert sql == "SELECT * FROM public.t1"
             assert explanation == "查询t1"

@@ -2,8 +2,43 @@
 
 import json
 import logging
+import re
 
 from openai import OpenAI
+
+
+def strip_think_tags(content: str) -> str:
+    """
+    Remove <think>...</think> tags from LLM response.
+    
+    Some open-source reasoning models (e.g., DeepSeek-R1, Qwen-QwQ) 
+    output their reasoning process wrapped in <think> tags before 
+    the actual response.
+    
+    Args:
+        content: Raw LLM response content
+        
+    Returns:
+        Content with <think> block removed (if present)
+        
+    Raises:
+        ValueError: If <think> tag is present but not closed (truncated output)
+    """
+    # First strip leading/trailing whitespace
+    content = content.strip()
+    
+    # Check for truncated think tags (opened but not closed)
+    if content.startswith("<think>") and "</think>" not in content:
+        raise ValueError(
+            "LLM output was truncated during reasoning. "
+            "The model's thinking process exceeded the token limit. "
+            "Please try a shorter query or increase max_tokens."
+        )
+    
+    # Pattern matches <think>...</think> including newlines
+    # Using non-greedy match to handle potential edge cases
+    pattern = r"^<think>.*?</think>\s*"
+    return re.sub(pattern, "", content, count=1, flags=re.DOTALL)
 
 from app.config import settings
 from app.services.db_manager import database_manager
@@ -213,6 +248,9 @@ Return a JSON array of relevant table names. Example: ["public.orders", "public.
                 logger.warning("Empty response from LLM in table selection, using fallback")
                 return all_table_names, True
 
+            # Strip <think>...</think> tags from reasoning models (e.g., DeepSeek-R1)
+            content = strip_think_tags(content)
+
             # Parse JSON response
             content = content.strip()
             # Handle markdown code blocks
@@ -398,13 +436,16 @@ User Request: {prompt}
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.1,  # Low temperature for more deterministic output
-                max_tokens=1024,
+                max_tokens=4096,  # Increased for reasoning models with <think> tags
             )
 
             # Parse response
             content = response.choices[0].message.content
             if not content:
                 raise ValueError("Empty response from LLM")
+
+            # Strip <think>...</think> tags from reasoning models (e.g., DeepSeek-R1)
+            content = strip_think_tags(content)
 
             # Try to parse JSON from response
             # Handle case where LLM wraps in markdown code blocks
