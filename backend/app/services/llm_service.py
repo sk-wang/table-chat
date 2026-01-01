@@ -1,19 +1,31 @@
-"""LLM service for natural language to SQL conversion."""
+"""LLM service for natural language to SQL conversion using Anthropic API."""
 
 import json
 import logging
 import re
 
-from openai import OpenAI
+from anthropic import Anthropic
+
+from app.config import settings
+from app.services.db_manager import database_manager
+
+logger = logging.getLogger(__name__)
+
+# === Prompt Chain Configuration ===
+# Skip table selection phase if table count is at or below this threshold
+TABLE_SELECTION_THRESHOLD = 3
+# Maximum number of tables to select in phase 1
+MAX_SELECTED_TABLES = 10
+# Max tokens for phase 1 (only need to return table names)
+PHASE1_MAX_TOKENS = 256
 
 
 def strip_think_tags(content: str) -> str:
     """
     Remove <think>...</think> tags from LLM response.
     
-    Some open-source reasoning models (e.g., DeepSeek-R1, Qwen-QwQ) 
-    output their reasoning process wrapped in <think> tags before 
-    the actual response.
+    Some reasoning models output their reasoning process wrapped in <think> tags
+    before the actual response.
     
     Args:
         content: Raw LLM response content
@@ -40,26 +52,12 @@ def strip_think_tags(content: str) -> str:
     pattern = r"^<think>.*?</think>\s*"
     return re.sub(pattern, "", content, count=1, flags=re.DOTALL)
 
-from app.config import settings
-from app.services.db_manager import database_manager
-
-logger = logging.getLogger(__name__)
-
-# === Prompt Chain Configuration ===
-# Skip table selection phase if table count is at or below this threshold
-TABLE_SELECTION_THRESHOLD = 3
-# Maximum number of tables to select in phase 1
-MAX_SELECTED_TABLES = 10
-# Max tokens for phase 1 (only need to return table names)
-PHASE1_MAX_TOKENS = 256
-
 
 class LLMService:
-    """Service for natural language to SQL conversion using LLM."""
+    """Service for natural language to SQL conversion using Anthropic API."""
 
     # Table selection prompts (Phase 1)
-    TABLE_SELECTION_PROMPT = {
-        "system": """You are a database schema analyst. Given a list of tables and a user query,
+    TABLE_SELECTION_SYSTEM_PROMPT = """You are a database schema analyst. Given a list of tables and a user query,
 identify which tables are most likely needed to answer the query.
 
 Rules:
@@ -69,8 +67,7 @@ Rules:
 4. Return empty array [] only if truly no table matches the query
 5. Consider table names AND comments when making decisions
 
-Example output: ["orders", "customers", "order_items"]""",
-    }
+Example output: ["orders", "customers", "order_items"]"""
 
     # SQL dialect prompts (Phase 2)
     DIALECT_PROMPTS = {
@@ -129,29 +126,70 @@ Example outputs:
         },
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize LLM service."""
-        self._client: OpenAI | None = None
+        self._client: Anthropic | None = None
 
     @property
-    def client(self) -> OpenAI:
-        """Get or create OpenAI client."""
+    def client(self) -> Anthropic:
+        """Get or create Anthropic client."""
         if self._client is None:
-            if not settings.is_llm_configured:
+            if not settings.is_configured:
                 raise ValueError(
                     "LLM API is not configured. Please set LLM_API_KEY environment variable."
                 )
 
-            self._client = OpenAI(
-                api_key=settings.effective_llm_api_key,
-                base_url=settings.effective_llm_api_base,
+            # 简化版架构：始终通过 proxy 连接，使用统一配置
+            self._client = Anthropic(
+                api_key=settings.effective_api_key,
+                base_url=settings.effective_api_base,
             )
         return self._client
 
     @property
     def is_available(self) -> bool:
         """Check if LLM service is available."""
-        return settings.is_llm_configured
+        return settings.is_configured
+
+    def _call_anthropic(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4096,
+        temperature: float = 0.1,
+    ) -> str:
+        """
+        Make a call to Anthropic API.
+        
+        Args:
+            system_prompt: System prompt for the model
+            user_prompt: User message content
+            max_tokens: Maximum tokens in response
+            temperature: Temperature for sampling (lower = more deterministic)
+            
+        Returns:
+            The text content of the response
+            
+        Raises:
+            ValueError: If response is empty
+        """
+        response = self.client.messages.create(
+            model=settings.effective_model,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        
+        # Extract text from response
+        if not response.content or len(response.content) == 0:
+            raise ValueError("Empty response from LLM")
+        
+        content = response.content[0].text
+        if not content:
+            raise ValueError("Empty text content from LLM")
+            
+        return content
 
     async def build_table_summary_context(self, db_name: str) -> tuple[str, int, list[str]]:
         """
@@ -206,7 +244,7 @@ Example outputs:
         Args:
             db_name: Database connection name
             prompt: User's natural language query
-            db_type: Database type ('postgresql' or 'mysql')
+            _db_type: Database type ('postgresql' or 'mysql') - reserved for future use
             
         Returns:
             Tuple of (selected_tables, fallback_used)
@@ -233,22 +271,14 @@ User Query: {prompt}
 Return a JSON array of relevant table names. Example: ["public.orders", "public.customers"]"""
 
         try:
-            response = self.client.chat.completions.create(
-                model=settings.llm_model,
-                messages=[
-                    {"role": "system", "content": self.TABLE_SELECTION_PROMPT["system"]},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.1,
+            content = self._call_anthropic(
+                system_prompt=self.TABLE_SELECTION_SYSTEM_PROMPT,
+                user_prompt=user_prompt,
                 max_tokens=PHASE1_MAX_TOKENS,
+                temperature=0.1,
             )
 
-            content = response.choices[0].message.content
-            if not content:
-                logger.warning("Empty response from LLM in table selection, using fallback")
-                return all_table_names, True
-
-            # Strip <think>...</think> tags from reasoning models (e.g., DeepSeek-R1)
+            # Strip <think>...</think> tags from reasoning models
             content = strip_think_tags(content)
 
             # Parse JSON response
@@ -429,22 +459,14 @@ User Request: {prompt}
 {user_suffix} Return ONLY the JSON object with "sql" and "explanation" fields."""
 
         try:
-            response = self.client.chat.completions.create(
-                model=settings.llm_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.1,  # Low temperature for more deterministic output
-                max_tokens=4096,  # Increased for reasoning models with <think> tags
+            content = self._call_anthropic(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=4096,
+                temperature=0.1,
             )
 
-            # Parse response
-            content = response.choices[0].message.content
-            if not content:
-                raise ValueError("Empty response from LLM")
-
-            # Strip <think>...</think> tags from reasoning models (e.g., DeepSeek-R1)
+            # Strip <think>...</think> tags from reasoning models
             content = strip_think_tags(content)
 
             # Try to parse JSON from response

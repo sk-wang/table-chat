@@ -52,18 +52,19 @@ class AgentService:
 
     @property
     def is_available(self) -> bool:
-        """Check if Agent service is available."""
-        return settings.is_agent_configured
+        """Check if Agent service is available (uses unified configuration)."""
+        return settings.is_configured
 
     def _get_client(self):
-        """Get or create Anthropic async client."""
+        """Get or create Anthropic async client using unified configuration."""
         if self._client is None:
             try:
                 from anthropic import AsyncAnthropic
 
+                # 简化版架构：始终通过 proxy 连接，使用统一配置
                 self._client = AsyncAnthropic(
-                    api_key=settings.agent_api_key,
-                    base_url=settings.agent_api_base if settings.agent_api_base else None,
+                    api_key=settings.effective_api_key,
+                    base_url=settings.effective_api_base,
                 )
             except ImportError:
                 logger.error("Anthropic package not installed")
@@ -99,13 +100,13 @@ class AgentService:
                 "data": {"status": "analyzing", "message": "正在分析您的需求..."},
             }
 
-            # Check if agent is configured
+            # Check if agent is configured (uses unified LLM configuration)
             if not self.is_available:
                 yield {
                     "event": "error",
                     "data": {
                         "error": "Agent 服务未配置",
-                        "detail": "请设置 AGENT_API_KEY 环境变量",
+                        "detail": "请设置 LLM_API_KEY 环境变量",
                     },
                 }
                 return
@@ -147,7 +148,7 @@ class AgentService:
                 try:
                     # Use async streaming for real-time output
                     async with client.messages.stream(
-                        model=settings.agent_model,
+                        model=settings.effective_model,
                         max_tokens=4096,
                         system=AGENT_SYSTEM_PROMPT,
                         tools=ANTHROPIC_TOOLS,

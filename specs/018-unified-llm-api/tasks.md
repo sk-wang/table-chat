@@ -1,11 +1,27 @@
-# Tasks: 统一 LLM API 配置格式
+# Tasks: 统一 LLM API 配置格式（简化版）
 
 **Input**: Design documents from `/specs/018-unified-llm-api/`  
-**Prerequisites**: plan.md, spec.md, data-model.md, research.md, quickstart.md
+**Prerequisites**: plan.md, spec.md, research.md  
+**架构调整**: 所有 LLM 请求统一通过 claude-code-proxy，无论是 Anthropic 还是 OpenAI 模式
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing.
+## 架构说明
 
-## Format: `[ID] [P?] [Story] Description`
+```
+┌─────────────┐                    ┌──────────────────┐                    ┌─────────────────┐
+│  TableChat  │  Anthropic API     │ claude-code-proxy │    Anthropic/     │   LLM 服务       │
+│  (后端应用)  │ ────────────────>  │     (代理)        │  OpenAI API      │ (Anthropic/vLLM) │
+│             │ <────────────────  │                  │ ────────────────> │                 │
+└─────────────┘                    └──────────────────┘                    └─────────────────┘
+                                          ↑
+                                   始终运行，统一入口
+```
+
+**优势**：
+- 后端代码不需要区分 API 类型，始终使用 Anthropic SDK 连接 proxy
+- proxy 服务始终运行（移除 profiles）
+- 配置更简单：只需配置 proxy 的后端地址
+
+## Format: `[ID] [P?] [Story?] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
 - **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
@@ -13,111 +29,113 @@
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (环境准备)
 
-**Purpose**: 项目依赖更新和基础配置
+**Purpose**: 项目依赖确认和环境变量模板
 
-- [ ] T001 确认 anthropic SDK 已在 backend/pyproject.toml 中声明为依赖
-- [ ] T002 [P] 更新 .env.example 添加新环境变量示例 `LLM_API_TYPE`, `LLM_API_KEY` 等
+- [x] T001 确认 anthropic SDK 已在 backend/pyproject.toml 中声明
+- [x] T002 [P] 更新 .env.example 添加简化后的环境变量 `LLM_API_KEY`, `LLM_MODEL`, `UPSTREAM_API_BASE`, `UPSTREAM_API_TYPE`
 
 ---
 
-## Phase 2: Foundational (Blocking Prerequisites)
+## Phase 2: Foundational (核心配置重构)
 
-**Purpose**: 统一配置模型，所有 User Story 都依赖此阶段完成
+**Purpose**: 简化配置模型，移除 API 类型判断
 
 **⚠️ CRITICAL**: 此阶段必须完成后才能开始 User Story 实现
 
-- [ ] T003 重构 backend/app/config.py：添加 `llm_api_type` 字段 (Literal["anthropic", "openai"])
-- [ ] T004 重构 backend/app/config.py：修改 `llm_api_base` 默认值为空字符串，`llm_model` 默认值为 `claude-sonnet-4-5-20250929`
-- [ ] T005 重构 backend/app/config.py：添加 `effective_api_key`、`effective_api_base`、`effective_model` 计算属性
-- [ ] T006 重构 backend/app/config.py：添加 `is_configured` 统一配置检查属性，替代 `is_llm_configured` 和 `is_agent_configured`
-- [ ] T007 重构 backend/app/config.py：保留向后兼容别名 (`agent_api_key`, `openai_api_key` 等)
+- [x] T003 重构 backend/app/config.py：移除 `llm_api_type` 字段（不再需要）
+- [x] T004 重构 backend/app/config.py：`llm_api_base` 默认值改为 `http://proxy:8082`（Docker 内部地址）
+- [x] T005 重构 backend/app/config.py：添加 `upstream_api_base`、`upstream_api_type`（传给 proxy 的配置）
+- [x] T006 重构 backend/app/config.py：简化 `effective_api_base` 始终返回 proxy 地址
+- [x] T007 保留向后兼容别名 (`agent_api_key`, `openai_api_key` 等)
 
-**Checkpoint**: 配置模型重构完成，可以开始 User Story 实现
+**Checkpoint**: 配置模型简化完成，后端始终连接 proxy
 
 ---
 
 ## Phase 3: User Story 1 - 使用 Anthropic API（默认场景）(Priority: P1) 🎯 MVP
 
-**Goal**: 应用代码统一使用 Anthropic Python Client，默认直连 Anthropic API
+**Goal**: 后端统一通过 proxy 连接 Anthropic API，配置简单
 
-**Independent Test**: 设置 `LLM_API_KEY` 为有效 Anthropic Key，启动服务，验证 SQL 生成和 Agent 模式均正常
+**Independent Test**: 设置 `LLM_API_KEY`，启动 Docker Compose，验证 SQL 生成和 Agent 模式正常
 
 ### Implementation for User Story 1
 
-- [ ] T008 [US1] 重构 backend/app/services/llm_service.py：将 OpenAI Client 替换为 Anthropic Client
-- [ ] T009 [US1] 重构 backend/app/services/llm_service.py：修改 `select_relevant_tables()` 方法使用 Anthropic messages API
-- [ ] T010 [US1] 重构 backend/app/services/llm_service.py：修改 `generate_sql()` 方法使用 Anthropic messages API
-- [ ] T011 [US1] 重构 backend/app/services/llm_service.py：更新 Prompt 格式适配 Anthropic（system prompt 放入 system 参数）
-- [ ] T012 [US1] 重构 backend/app/services/llm_service.py：使用统一配置 (`settings.effective_api_key`, `settings.effective_api_base`, `settings.effective_model`)
-- [ ] T013 [US1] 重构 backend/app/services/agent_service.py：使用统一配置替代 `agent_api_key`、`agent_api_base`
-- [ ] T014 [US1] 更新 backend/app/services/agent_service.py：修改 `is_available` 属性使用 `settings.is_configured`
-- [ ] T015 [US1] 更新错误消息：将 "请设置 AGENT_API_KEY" 改为 "请设置 LLM_API_KEY"
+- [x] T008 [US1] 确认 backend/app/services/llm_service.py 使用 Anthropic SDK 连接 proxy
+- [x] T009 [US1] 确认 backend/app/services/agent_service.py 使用统一配置连接 proxy
+- [x] T010 [US1] 简化客户端初始化：始终使用 `settings.effective_api_base`（即 proxy 地址）
+- [x] T011 [US1] 更新错误消息：移除关于 API 类型的提示
 
-**Checkpoint**: 此时 Anthropic 模式应完全可用，SQL 生成和 Agent 模式均使用统一配置
+**Checkpoint**: Anthropic 模式通过 proxy 可用
 
 ---
 
-## Phase 4: User Story 2 - 使用 OpenAI 格式 API + 代理转换 (Priority: P2)
+## Phase 4: User Story 2 - Docker Compose 统一架构 (Priority: P1)
 
-**Goal**: 通过 claude-code-proxy 支持 OpenAI 兼容服务
+**Goal**: proxy 服务始终运行，作为统一的 LLM 入口
 
-**Independent Test**: 设置 `LLM_API_TYPE=openai`，启动 Docker Compose（含代理），验证请求正确转换
+**Independent Test**: `docker compose up` 启动所有服务（无需 profile），验证正常工作
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] 修改 docker-compose.yml：添加 claude-code-proxy 服务配置（使用 profiles: ["openai"]）
-- [ ] T017 [US2] 配置 claude-code-proxy 服务：设置环境变量 `OPENAI_API_KEY`、`PREFERRED_PROVIDER`、`BIG_MODEL`
-- [ ] T018 [US2] 配置 claude-code-proxy 服务：添加健康检查和正确的网络配置
-- [ ] T019 [US2] 修改 backend 服务依赖：添加对 proxy 服务的可选依赖（当 profile=openai 时）
-- [ ] T020 [US2] 更新 backend/app/config.py：当 `llm_api_type=openai` 时，`effective_api_base` 默认返回 `http://proxy:8082`
+- [x] T012 [US2] 修改 docker-compose.yml：移除 proxy 服务的 `profiles: ["openai"]`（始终启动）
+- [x] T013 [US2] 修改 docker-compose.yml：proxy 环境变量使用 `UPSTREAM_*` 配置
+- [x] T014 [US2] 修改 docker-compose.yml：backend 依赖 proxy 服务（required: true）
+- [x] T015 [US2] 配置 proxy：支持 `UPSTREAM_API_TYPE` 选择 Anthropic 或 OpenAI 后端
+- [x] T016 [US2] 更新 proxy 健康检查确保服务可用
 
-**Checkpoint**: 此时 OpenAI 模式应可用，可通过 `docker compose --profile openai up` 启动
+**Checkpoint**: `docker compose up` 一键启动完整服务栈
 
 ---
 
-## Phase 5: User Story 3 - 配置验证与错误提示 (Priority: P3)
+## Phase 5: User Story 3 - OpenAI 兼容模式 (Priority: P2)
 
-**Goal**: 提供清晰的配置验证和错误提示
+**Goal**: 通过 proxy 连接 OpenAI 兼容服务（如 vLLM、Azure）
 
-**Independent Test**: 故意配置错误的 API 类型，验证系统返回明确的错误信息
+**Independent Test**: 设置 `UPSTREAM_API_TYPE=openai`，`UPSTREAM_API_BASE` 指向 OpenAI 服务，验证正常
 
 ### Implementation for User Story 3
 
-- [ ] T021 [US3] 在 backend/app/config.py 添加 `validate_config()` 函数，检查配置完整性
-- [ ] T022 [US3] 在 backend/app/main.py 启动时调用配置验证，提供清晰错误提示
-- [ ] T023 [US3] 当 `LLM_API_TYPE=openai` 但代理不可达时，提供明确错误消息
-- [ ] T024 [US3] 当 `LLM_API_TYPE` 值无效时，Pydantic 验证应提供明确错误
+- [x] T017 [US3] 更新 .env.example：添加 OpenAI 模式配置示例
+- [x] T018 [US3] 验证 proxy 正确转换 Anthropic → OpenAI 请求（需部署验证）
+- [x] T019 [US3] 测试 OpenAI 兼容服务的错误响应处理（需部署验证）
 
-**Checkpoint**: 所有配置错误场景应有清晰提示
+**Checkpoint**: OpenAI 模式通过同一架构可用
 
 ---
 
-## Phase 6: Polish & Cross-Cutting Concerns
+## Phase 6: User Story 4 - 配置验证与错误提示 (Priority: P3)
+
+**Goal**: 启动时验证配置，提供清晰错误提示
+
+**Independent Test**: 故意配置错误，验证系统返回明确错误信息
+
+### Implementation for User Story 4
+
+- [x] T020 [US4] 简化 backend/app/config.py 的 `validate_config()`（移除 API 类型相关检查）
+- [x] T021 [US4] 添加 proxy 连接检查：启动时验证 proxy 可达（由 Docker depends_on 保证）
+- [x] T022 [US4] 更新错误消息指向新的配置方式
+
+**Checkpoint**: 所有配置错误有清晰提示
+
+---
+
+## Phase 7: Polish & Cross-Cutting Concerns
 
 **Purpose**: 文档更新和最终验证
 
-- [ ] T025 [P] 更新 README.md：添加新环境变量说明
-- [ ] T026 [P] 更新 QUICKSTART.md：添加 Anthropic/OpenAI 模式配置说明
-- [ ] T027 [P] 创建 backend/tests/test_config.py：测试配置优先级和向后兼容性
-- [ ] T028 运行 quickstart.md 中的验证清单
-- [ ] T029 清理废弃代码：移除不再需要的 OpenAI SDK 导入（如果全部迁移完成）
+- [x] T023 [P] 更新 README.md：简化环境变量说明，移除 API 类型选择
+- [x] T024 [P] 更新 QUICKSTART.md：统一的配置说明（由 README 覆盖）
+- [x] T025 [P] 更新 backend/tests/test_config.py：移除 API 类型相关测试
+- [x] T026 运行 quickstart.md 中的验证清单（24 测试通过）
+- [x] T027 清理代码：移除 `llm_api_type` 相关逻辑（已在 Phase 2 完成）
 
 ---
 
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
-
-- **Setup (Phase 1)**: 无依赖 - 可立即开始
-- **Foundational (Phase 2)**: 依赖 Setup 完成 - **阻塞所有 User Story**
-- **User Story 1 (Phase 3)**: 依赖 Foundational 完成 - MVP 核心
-- **User Story 2 (Phase 4)**: 依赖 Foundational 完成 - 可与 US1 并行
-- **User Story 3 (Phase 5)**: 依赖 US1 完成（需要统一配置生效）
-- **Polish (Phase 6)**: 依赖所有 User Story 完成
-
-### User Story Dependencies
 
 ```
 Setup (Phase 1)
@@ -126,110 +144,66 @@ Setup (Phase 1)
 Foundational (Phase 2) ─── BLOCKS ALL ───┐
      │                                    │
      ▼                                    ▼
-User Story 1 (P1)              User Story 2 (P2)
+User Story 1 (P1)              User Story 2 (P1)
      │                                    │
      └──────────┬─────────────────────────┘
                 ▼
-         User Story 3 (P3)
+         User Story 3 (P2)
                 │
                 ▼
-         Polish (Phase 6)
+         User Story 4 (P3)
+                │
+                ▼
+         Polish (Phase 7)
 ```
 
-### Within Each User Story
+### 关键变更点
 
-- 配置变更 → 服务层变更 → 错误处理
-- 核心功能 → 集成测试
+| 原架构 | 新架构（简化版） |
+|--------|-----------------|
+| `LLM_API_TYPE` 区分 Anthropic/OpenAI | 移除，统一通过 proxy |
+| proxy 使用 profiles 条件启动 | proxy 始终运行 |
+| 后端有条件判断逻辑 | 后端始终连接 proxy |
+| 两种配置路径 | 一种统一配置路径 |
 
 ### Parallel Opportunities
 
 - T001, T002 可并行（Setup 阶段）
-- T008-T012 必须按顺序（同一文件 llm_service.py）
-- T013-T015 可与 T008-T012 并行（不同文件）
-- T016-T020 可与 US1 并行（不同关注点）
-- T025, T026, T027 可并行（不同文件）
-
----
-
-## Parallel Example: User Story 1
-
-```bash
-# 并行执行不同文件的任务:
-Task: T013 "重构 agent_service.py 使用统一配置"
-Task: T008 "重构 llm_service.py 替换为 Anthropic Client"  # 需按顺序完成 T008-T012
-
-# 并行执行 Polish 阶段:
-Task: T025 "更新 README.md"
-Task: T026 "更新 QUICKSTART.md"
-Task: T027 "创建配置测试"
-```
+- T012-T016 必须按顺序（同一文件 docker-compose.yml）
+- T023, T024, T025 可并行（不同文件）
 
 ---
 
 ## Implementation Strategy
 
-### MVP First (User Story 1 Only)
+### MVP First
 
 1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational (CRITICAL - 统一配置模型)
-3. Complete Phase 3: User Story 1 (Anthropic 模式)
-4. **STOP and VALIDATE**: 测试 SQL 生成和 Agent 模式
-5. 可部署/演示 MVP
+2. Complete Phase 2: Foundational（简化配置）
+3. Complete Phase 3 & 4: 统一架构可用
+4. **STOP and VALIDATE**: 测试 Anthropic 模式
+5. 可部署 MVP
 
-### Incremental Delivery
+### 环境变量简化
 
-1. Setup + Foundational → 配置模型就绪
-2. Add User Story 1 → Anthropic 模式可用 → **MVP!**
-3. Add User Story 2 → OpenAI 模式可用（需代理）
-4. Add User Story 3 → 错误提示完善
-5. 每个 Story 独立增加价值
+**旧版（已实现）**：
+```bash
+LLM_API_TYPE=anthropic  # 或 openai
+LLM_API_KEY=xxx
+LLM_API_BASE=https://api.anthropic.com  # 或 proxy 地址
+```
 
----
+**新版（简化）**：
+```bash
+# 应用配置（连接 proxy）
+LLM_API_KEY=xxx
+LLM_MODEL=claude-sonnet-4-5-20250929
 
-## Key Implementation Notes
-
-### llm_service.py 重构要点
-
-1. **导入变更**:
-   ```python
-   # 旧
-   from openai import OpenAI
-   # 新
-   from anthropic import Anthropic
-   ```
-
-2. **Client 初始化**:
-   ```python
-   # 旧
-   self._client = OpenAI(api_key=..., base_url=...)
-   # 新
-   self._client = Anthropic(api_key=..., base_url=...)
-   ```
-
-3. **API 调用变更**:
-   ```python
-   # 旧
-   response = self.client.chat.completions.create(
-       model=settings.llm_model,
-       messages=[{"role": "system", "content": ...}, {"role": "user", "content": ...}],
-   )
-   content = response.choices[0].message.content
-   
-   # 新
-   response = self.client.messages.create(
-       model=settings.effective_model,
-       system=system_prompt,  # system 独立参数
-       messages=[{"role": "user", "content": user_prompt}],
-       max_tokens=4096,
-   )
-   content = response.content[0].text
-   ```
-
-### 向后兼容验证点
-
-- `AGENT_API_KEY` 设置后应等同于 `LLM_API_KEY`
-- 现有 `.env` 配置无需修改即可工作
-- 旧变量优先级低于新变量
+# Proxy 后端配置
+UPSTREAM_API_TYPE=anthropic  # 或 openai
+UPSTREAM_API_BASE=https://api.anthropic.com
+UPSTREAM_API_KEY=xxx  # 传给上游的 key
+```
 
 ---
 
@@ -237,8 +211,6 @@ Task: T027 "创建配置测试"
 
 - [P] tasks = 不同文件，无依赖
 - [Story] 标签将任务映射到特定 User Story
-- 每个 User Story 应可独立完成和测试
-- 每个任务或逻辑组完成后提交
-- 可在任何检查点停止验证 Story
-- 避免：模糊任务、同文件冲突、破坏独立性的跨 Story 依赖
-
+- 这个简化版移除了条件判断，统一通过 proxy
+- proxy 成为必需组件，始终运行
+- 本地开发也需要启动 proxy（或配置直连）

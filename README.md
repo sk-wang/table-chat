@@ -31,21 +31,19 @@
 
 ## ✨ 核心亮点
 
-<table>
-<tr>
-<td width="50%">
-
 ### 🧠 AI Agent 模式
 
 不同于简单的 "文字转SQL"，TableChat 的 **Agent 模式** 让 AI 像一个真正的数据库专家一样工作：
 
-- 🔍 **自主探索** — AI 会主动查看表结构、理解表关系
-- 💭 **透明思考** — 实时看到 AI 的推理过程和工具调用
-- 🛠️ **智能工具使用** — 列表、查结构、试查询，步步为营
-- ✅ **生成任意 SQL** — SELECT、CREATE INDEX、ALTER TABLE 都行
+| 能力 | 说明 |
+|------|------|
+| 🔍 **自主探索** | AI 会主动查看表结构、理解表关系 |
+| 💭 **透明思考** | 实时看到 AI 的推理过程和工具调用 |
+| 🛠️ **智能工具** | 列表、查结构、试查询，步步为营 |
+| ✅ **任意 SQL** | SELECT、CREATE INDEX、ALTER TABLE 都行 |
 
-</td>
-<td width="50%">
+<details>
+<summary>💡 <b>示例：创建索引</b></summary>
 
 ```
 👤 用户: 帮我给订单表的用户ID加个索引
@@ -53,15 +51,12 @@
 🤖 Agent 思考中...
    ├─ 🔧 list_tables → 发现 orders, users, products...
    ├─ 🔧 get_table_schema("orders") → 找到 user_id 字段
-   └─ 💡 生成: CREATE INDEX idx_orders_user_id 
-              ON orders(user_id);
+   └─ 💡 生成: CREATE INDEX idx_orders_user_id ON orders(user_id);
 
 ✅ SQL 已生成，点击复制到编辑器
 ```
 
-</td>
-</tr>
-</table>
+</details>
 
 
 ## 🚀 快速开始
@@ -73,13 +68,12 @@
 git clone https://github.com/your-username/tableChat.git
 cd tableChat
 
-# 2. 配置 API Key（Agent 模式需要）
+# 2. 配置 API Key
 cp .env.example .env
-# 编辑 .env，填入你的 Anthropic API Key:
-# AGENT_API_KEY=sk-ant-xxxxx
+# 编辑 .env，填入 LLM_API_KEY（详见下方「环境变量」章节）
 
 # 3. 一键启动
-docker compose up --build -d
+docker compose up -d
 
 # 🎉 完成！
 # 前端: http://localhost:5888
@@ -87,17 +81,13 @@ docker compose up --build -d
 ```
 
 <details>
-<summary>📋 <b>停止和日志</b></summary>
+<summary>📋 <b>常用命令</b></summary>
 
 ```bash
-# 停止服务
-docker compose down
-
-# 查看日志
-docker compose logs -f
-
-# 重新构建
-docker compose up --build
+docker compose ps          # 查看状态
+docker compose logs -f     # 查看日志
+docker compose down        # 停止服务
+docker compose up --build  # 重新构建
 ```
 
 </details>
@@ -183,23 +173,78 @@ docker compose up --build
 
 ---
 
+## 🔌 LLM 架构
+
+### 为什么选择 Anthropic API？
+
+TableChat 的 **Agent 模式** 是核心功能，需要 LLM 具备强大的工具调用（Tool Use）能力。经过测试，**Anthropic Claude 在 Agent 场景下表现最佳**：
+
+- 🧠 **更精准的工具调用** — Claude 能准确理解何时该调用哪个工具
+- 🔗 **更好的多步推理** — 复杂查询场景下，能正确串联 `list_tables` → `get_schema` → `query` 等步骤  
+- 📝 **更清晰的思考链** — 输出的推理过程更易读、更有条理
+
+因此，TableChat 后端统一使用 **Anthropic SDK**。
+
+### 统一代理架构
+
+但我们也理解，很多用户希望使用其他 LLM 服务（如 vLLM、Azure OpenAI、本地部署模型等）。为了**兼容 OpenAI 格式的服务**，我们引入了 `claude-code-proxy` 作为统一入口：
+
+```
+┌─────────────┐                    ┌──────────────────┐                    ┌─────────────────┐
+│  TableChat  │   Anthropic API    │ claude-code-proxy │   Anthropic/      │   LLM 服务       │
+│   (后端)     │ ─────────────────> │      (代理)       │   OpenAI API     │ (Claude/vLLM等) │
+└─────────────┘                    └──────────────────┘ ─────────────────> └─────────────────┘
+                                          ↑
+                                   所有请求统一入口
+```
+
+**优势**：
+- ✅ 后端代码简单 — 只需维护一套 Anthropic SDK 代码
+- ✅ 配置统一 — 切换 LLM 只需改环境变量，无需改代码
+- ✅ 一键部署 — `docker compose up` 自动启动 proxy
+
+---
+
 ## ⚙️ 环境变量
-
-### Agent 模式配置（推荐）
-
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `AGENT_API_KEY` | Anthropic API Key（必填） | `sk-ant-api03-xxxxx` |
-| `AGENT_API_BASE` | API 地址（可选） | `https://api.anthropic.com` |
-| `AGENT_MODEL` | 使用的模型 | `claude-sonnet-4-5-20250929` |
-
-### 自然语言模式配置（可选）
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `LLM_API_KEY` | OpenAI 兼容 API Key | - |
-| `LLM_API_BASE` | API 地址 | `https://api.openai.com/v1` |
-| `LLM_MODEL` | 模型名称 | `gpt-3.5-turbo` |
+| `LLM_API_KEY` | API Key（必填） | - |
+| `LLM_MODEL` | 使用的模型 | `claude-sonnet-4-5-20250929` |
+| `UPSTREAM_API_TYPE` | 上游类型: `anthropic` 或 `openai` | `anthropic` |
+| `UPSTREAM_API_BASE` | 上游 API 地址（可选） | 根据类型自动选择 |
+
+### 🔵 Anthropic 模式（推荐）
+
+直接使用 Claude API，Agent 效果最佳：
+
+```bash
+LLM_API_KEY=sk-ant-api03-xxxxx
+# 就这么简单！一键启动：
+docker compose up
+```
+
+### 🟢 OpenAI 兼容模式
+
+连接 vLLM、LM Studio、Ollama 等服务：
+
+```bash
+LLM_API_KEY=your-key
+UPSTREAM_API_TYPE=openai
+UPSTREAM_API_BASE=http://your-server:8000/v1
+
+# ⚠️ 模型名需要 openai/ 前缀
+LLM_MODEL=openai/qwen/qwen3-4b-2507
+
+# 同样一键启动：
+docker compose up
+```
+
+> ⚠️ **注意**：OpenAI 兼容模式的 Agent 效果取决于模型的 Tool Use 能力。建议使用 GPT-4o 或同等级模型。
+
+### 向后兼容
+
+旧变量仍然支持：`AGENT_API_KEY`、`AGENT_API_BASE`、`AGENT_MODEL`
 
 ---
 
@@ -259,14 +304,27 @@ tableChat/
 
 ## 🗺️ Roadmap
 
-- [x] 🤖 Agent 模式 (Claude)
-- [x] 💬 自然语言查询
-- [x] 🗄️ PostgreSQL + MySQL
-- [x] 📊 多格式导出
-- [x] 📜 执行历史 + 中文搜索
-- [ ] 🔐 SSH 隧道支持
-- [ ] 📝 查询收藏
+### ✅ 已完成
+
+- [x] 🤖 **Agent 模式** — Claude 驱动的智能数据库探索
+- [x] 💬 **自然语言查询** — 两阶段提示链，支持大型数据库
+- [x] 🗄️ **多数据库支持** — PostgreSQL + MySQL
+- [x] 📊 **多格式导出** — CSV / JSON / XLSX
+- [x] 📜 **执行历史** — 中文全文搜索 (FTS5)
+- [x] 🔐 **SSH 隧道** — 安全连接内网数据库
+- [x] 🔌 **统一 LLM API** — Anthropic + OpenAI 兼容模式
+- [x] 🐳 **一键部署** — Docker Compose 开箱即用
+
+### 🚧 进行中
+
+- [ ] 📝 查询收藏与分享
+- [ ] 🎨 自定义主题
+
+### 📋 计划中
+
 - [ ] 👥 多用户支持
+- [ ] 🔒 权限管理
+- [ ] 📈 查询性能分析
 
 ---
 

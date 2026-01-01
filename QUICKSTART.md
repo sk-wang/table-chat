@@ -24,13 +24,17 @@ cd backend
 
 # 配置环境变量（如果需要）
 cat > .env << 'EOF'
-OPENAI_API_KEY=your_key_here
-OPENAI_BASE_URL=https://api.openai.com/v1
+# 统一 LLM 配置（推荐使用 Anthropic）
+LLM_API_KEY=sk-ant-xxxxx
+LLM_API_TYPE=anthropic
+LLM_MODEL=claude-sonnet-4-5-20250929
+
+# 数据库路径
 DATABASE_PATH=./scinew.db
 EOF
 
 # 启动服务
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 7888
 ```
 
 后端 API 将运行在: http://localhost:7888

@@ -88,6 +88,16 @@ class TestStripThinkTags:
         assert "<think>" not in result
 
 
+def create_anthropic_response(text_content: str) -> MagicMock:
+    """Create a mock Anthropic API response."""
+    mock_text_block = MagicMock()
+    mock_text_block.text = text_content
+    
+    mock_response = MagicMock()
+    mock_response.content = [mock_text_block]
+    return mock_response
+
+
 class TestLLMService:
     """Test suite for LLMService."""
 
@@ -99,38 +109,53 @@ class TestLLMService:
     def test_is_available_when_configured(self, service):
         """Test is_available returns True when API key is set."""
         with patch("app.services.llm_service.settings") as mock_settings:
-            mock_settings.is_llm_configured = True
+            mock_settings.is_configured = True
 
             assert service.is_available is True
 
     def test_is_available_when_not_configured(self, service):
         """Test is_available returns False when API key is not set."""
         with patch("app.services.llm_service.settings") as mock_settings:
-            mock_settings.is_llm_configured = False
+            mock_settings.is_configured = False
 
             assert service.is_available is False
 
     def test_client_raises_when_not_configured(self, service):
         """Test client property raises ValueError when not configured."""
         with patch("app.services.llm_service.settings") as mock_settings:
-            mock_settings.is_llm_configured = False
+            mock_settings.is_configured = False
 
             with pytest.raises(ValueError, match="LLM API is not configured"):
                 _ = service.client
 
-    def test_client_creates_openai_instance(self, service):
-        """Test client creates OpenAI instance when configured."""
+    def test_client_creates_anthropic_instance(self, service):
+        """Test client creates Anthropic instance when configured."""
         with patch("app.services.llm_service.settings") as mock_settings, \
-             patch("app.services.llm_service.OpenAI") as mock_openai:
-            mock_settings.is_llm_configured = True
-            mock_settings.effective_llm_api_key = "test-key"
-            mock_settings.effective_llm_api_base = "https://api.openai.com/v1"
+             patch("app.services.llm_service.Anthropic") as mock_anthropic:
+            mock_settings.is_configured = True
+            mock_settings.effective_api_key = "test-key"
+            mock_settings.effective_api_base = "https://api.anthropic.com"
 
             client = service.client
 
-            mock_openai.assert_called_once_with(
+            mock_anthropic.assert_called_once_with(
                 api_key="test-key",
-                base_url="https://api.openai.com/v1",
+                base_url=None,  # None for default Anthropic base
+            )
+
+    def test_client_creates_anthropic_with_custom_base(self, service):
+        """Test client uses custom base_url when not default Anthropic."""
+        with patch("app.services.llm_service.settings") as mock_settings, \
+             patch("app.services.llm_service.Anthropic") as mock_anthropic:
+            mock_settings.is_configured = True
+            mock_settings.effective_api_key = "test-key"
+            mock_settings.effective_api_base = "http://proxy:8082"
+
+            client = service.client
+
+            mock_anthropic.assert_called_once_with(
+                api_key="test-key",
+                base_url="http://proxy:8082",
             )
 
     @pytest.mark.asyncio
@@ -186,20 +211,14 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_success(self, service):
         """Test generate_sql returns SQL and explanation."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
+        mock_response = create_anthropic_response(
+            '{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
                 )
-            )
-        ]
 
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
 
             sql, explanation, export_format = await service.generate_sql("testdb", "查询所有用户")
 
@@ -210,20 +229,10 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_handles_markdown_code_block(self, service):
         """Test generate_sql strips markdown code blocks from response."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='```json\n{"sql": "SELECT 1", "explanation": "test"}\n```'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '```json\n{"sql": "SELECT 1", "explanation": "test"}\n```'
 
             sql, explanation, export_format = await service.generate_sql("testdb", "test")
 
@@ -232,18 +241,10 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_handles_raw_sql_response(self, service):
         """Test generate_sql handles non-JSON raw SQL response."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(content="SELECT * FROM users WHERE id = 1")
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = "SELECT * FROM users WHERE id = 1"
 
             sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1")
 
@@ -254,20 +255,10 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_rejects_non_select(self, service):
         """Test generate_sql raises error for non-SELECT queries."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='{"sql": "DELETE FROM users", "explanation": "删除用户"}'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '{"sql": "DELETE FROM users", "explanation": "删除用户"}'
 
             with pytest.raises(ValueError, match="not a SELECT statement"):
                 await service.generate_sql("testdb", "删除用户")
@@ -275,16 +266,10 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_empty_response(self, service):
         """Test generate_sql raises error for empty response."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content=None))
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.side_effect = ValueError("Empty response from LLM")
 
             with pytest.raises(ValueError, match="Empty response from LLM"):
                 await service.generate_sql("testdb", "test")
@@ -293,10 +278,9 @@ class TestLLMService:
     async def test_generate_sql_api_error(self, service):
         """Test generate_sql raises error when API fails."""
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.side_effect = Exception("API Error")
-            service._client = mock_client
+            mock_call.side_effect = Exception("API Error")
 
             with pytest.raises(ValueError, match="LLM generation failed"):
                 await service.generate_sql("testdb", "test")
@@ -304,81 +288,46 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_mysql_dialect(self, service):
         """Test generate_sql uses MySQL dialect when db_type is mysql."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='{"sql": "SELECT * FROM `users` WHERE `id` = 1", "explanation": "查询用户1"}'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '{"sql": "SELECT * FROM `users` WHERE `id` = 1", "explanation": "查询用户1"}'
 
-            # Call with mysql dialect
             sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1", db_type="mysql")
 
             assert sql == "SELECT * FROM `users` WHERE `id` = 1"
             assert explanation == "查询用户1"
 
-            # Verify the MySQL prompt was used
-            call_args = mock_client.chat.completions.create.call_args
-            messages = call_args.kwargs.get("messages", [])
-            system_message = messages[0]["content"] if messages else ""
-            assert "MySQL" in system_message
-            assert "`users`" in system_message or "backtick" in system_message.lower()
+            # Verify MySQL prompt was used
+            call_args = mock_call.call_args
+            system_prompt = call_args.kwargs.get("system_prompt", "")
+            assert "MySQL" in system_prompt
 
     @pytest.mark.asyncio
     async def test_generate_sql_postgresql_dialect(self, service):
         """Test generate_sql uses PostgreSQL dialect when db_type is postgresql."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='{"sql": "SELECT * FROM public.users WHERE id = 1", "explanation": "查询用户1"}'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '{"sql": "SELECT * FROM public.users WHERE id = 1", "explanation": "查询用户1"}'
 
-            # Call with postgresql dialect (default)
             sql, explanation, export_format = await service.generate_sql("testdb", "查询用户1", db_type="postgresql")
 
             assert sql == "SELECT * FROM public.users WHERE id = 1"
             assert explanation == "查询用户1"
 
-            # Verify the PostgreSQL prompt was used
-            call_args = mock_client.chat.completions.create.call_args
-            messages = call_args.kwargs.get("messages", [])
-            system_message = messages[0]["content"] if messages else ""
-            assert "PostgreSQL" in system_message
+            # Verify PostgreSQL prompt was used
+            call_args = mock_call.call_args
+            system_prompt = call_args.kwargs.get("system_prompt", "")
+            assert "PostgreSQL" in system_prompt
 
     @pytest.mark.asyncio
     async def test_generate_sql_handles_think_tags_with_json(self, service):
         """Test generate_sql strips <think> tags before parsing JSON."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='<think>用户需要查询用户表...</think>{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '<think>用户需要查询用户表...</think>{"sql": "SELECT * FROM users", "explanation": "查询所有用户"}'
 
             sql, explanation, export_format = await service.generate_sql("testdb", "查询所有用户")
 
@@ -388,20 +337,10 @@ class TestLLMService:
     @pytest.mark.asyncio
     async def test_generate_sql_handles_think_tags_with_markdown(self, service):
         """Test generate_sql strips <think> tags followed by markdown code block."""
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(
-                message=MagicMock(
-                    content='<think>分析需求...\n构建JSON。</think>\n```json\n{"sql": "SELECT id FROM users", "explanation": "查询用户ID"}\n```'
-                )
-            )
-        ]
-
         with patch.object(service, "build_schema_context", new_callable=AsyncMock) as mock_schema, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_schema.return_value = "Schema info"
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '<think>分析需求...\n构建JSON。</think>\n```json\n{"sql": "SELECT id FROM users", "explanation": "查询用户ID"}\n```'
 
             sql, explanation, export_format = await service.generate_sql("testdb", "查询用户ID")
 
@@ -497,16 +436,10 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
         ]
 
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content='["public.orders", "public.customers"]'))
-        ]
-
         with patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '["public.orders", "public.customers"]'
 
             selected, fallback = await service.select_relevant_tables("testdb", "查询订单", "postgresql")
 
@@ -525,16 +458,10 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
         ]
 
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content='[]'))
-        ]
-
         with patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = '[]'
 
             selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
 
@@ -571,16 +498,10 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "t4", "table_type": "table", "table_comment": ""},
         ]
 
-        mock_response = MagicMock()
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content='Not valid JSON'))
-        ]
-
         with patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            mock_call.return_value = 'Not valid JSON'
 
             selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
 
@@ -662,32 +583,24 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "t4", "table_type": "table", "table_comment": "", "columns": []},
         ]
 
-        # Phase 1 response: select tables
-        phase1_response = MagicMock()
-        phase1_response.choices = [MagicMock(message=MagicMock(content='["public.t1", "public.t2"]'))]
-        
-        # Phase 2 response: generate SQL
-        phase2_response = MagicMock()
-        phase2_response.choices = [
-            MagicMock(message=MagicMock(content='{"sql": "SELECT * FROM public.t1", "explanation": "查询t1"}'))
-        ]
-
         with patch("app.services.llm_service.database_manager") as mock_mgr, \
              patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_mgr.get_database = AsyncMock(return_value={"name": "testdb"})
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
             
             # Return different responses for phase 1 and phase 2
-            mock_client.chat.completions.create.side_effect = [phase1_response, phase2_response]
-            service._client = mock_client
+            mock_call.side_effect = [
+                '["public.t1", "public.t2"]',  # Phase 1
+                '{"sql": "SELECT * FROM public.t1", "explanation": "查询t1"}'  # Phase 2
+            ]
 
             sql, explanation, export_format = await service.generate_sql("testdb", "查询t1数据")
 
             assert sql == "SELECT * FROM public.t1"
             assert explanation == "查询t1"
             # Should have called LLM twice (phase 1 + phase 2)
-            assert mock_client.chat.completions.create.call_count == 2
+            assert mock_call.call_count == 2
 
     @pytest.mark.asyncio
     async def test_select_relevant_tables_filters_invalid_table_names(self, service):
@@ -699,17 +612,11 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
         ]
 
-        mock_response = MagicMock()
-        # LLM returns a mix of valid and invalid table names
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content='["public.orders", "nonexistent_table", "public.customers"]'))
-        ]
-
         with patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            # LLM returns a mix of valid and invalid table names
+            mock_call.return_value = '["public.orders", "nonexistent_table", "public.customers"]'
 
             selected, fallback = await service.select_relevant_tables("testdb", "查询订单", "postgresql")
 
@@ -729,17 +636,11 @@ class TestPromptChain:
             {"schema_name": "public", "table_name": "categories", "table_type": "table", "table_comment": ""},
         ]
 
-        mock_response = MagicMock()
-        # All table names are invalid
-        mock_response.choices = [
-            MagicMock(message=MagicMock(content='["invalid1", "invalid2"]'))
-        ]
-
         with patch("app.db.sqlite.db_manager") as mock_db, \
-             patch.object(service, "_client", create=True) as mock_client:
+             patch.object(service, "_call_anthropic") as mock_call:
             mock_db.get_metadata_for_database = AsyncMock(return_value=mock_metadata)
-            mock_client.chat.completions.create.return_value = mock_response
-            service._client = mock_client
+            # All table names are invalid
+            mock_call.return_value = '["invalid1", "invalid2"]'
 
             selected, fallback = await service.select_relevant_tables("testdb", "查询", "postgresql")
 

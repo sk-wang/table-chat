@@ -1,7 +1,44 @@
 # Docker Compose configuration for TableChat
+# 简化版架构：所有 LLM 请求统一通过 proxy
 version: '3.8'
 
 services:
+  # ==========================================================================
+  # proxy: LLM API 统一代理（始终运行）
+  # ==========================================================================
+  # claude-code-proxy 作为所有 LLM 请求的统一入口
+  # 支持 Anthropic 和 OpenAI 格式的上游服务
+  proxy:
+    image: ghcr.io/1rgs/claude-code-proxy:main
+    container_name: tablechat-proxy
+    # 不再使用 profiles，始终启动
+    env_file:
+      - .env
+    environment:
+      # 上游服务配置
+      - ANTHROPIC_API_KEY=${LUPSTREAM_API_KEY:-${LLM_API_KEY}}
+       - ANTHROPIC_API_BASE=${UPSTREAM_API_BASE:-https://api.anthropic.com}
+      - OPENAI_API_KEY=${UPSTREAM_API_KEY:-${LLM_API_KEY}}
+      - OPENAI_API_BASE=${UPSTREAM_API_BASE:-https://api.openai.com/v1}
+      # 代理行为配置
+      - PREFERRED_PROVIDER=${UPSTREAM_API_TYPE:-anthropic}
+      - BIG_MODEL=${LLM_MODEL:-claude-sonnet-4-5-20250929}
+      - SMALL_MODEL=${LLM_MODEL:-claude-sonnet-4-5-20250929}
+    ports:
+      - "8082:8082"
+    networks:
+      - tablechat-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================================================
+  # backend: TableChat API 服务
+  # ==========================================================================
   backend:
     build:
       context: .
@@ -13,6 +50,8 @@ services:
       - .env
     environment:
       - DATABASE_PATH=/data/scinew.db
+      # 后端始终连接 proxy（Docker 内部地址）
+      - LLM_API_BASE=http://proxy:8082
     volumes:
       - tablechat-data:/data
     networks:
@@ -24,7 +63,14 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    # 必须依赖 proxy 服务
+    depends_on:
+      proxy:
+        condition: service_healthy
 
+  # ==========================================================================
+  # frontend: TableChat Web 界面
+  # ==========================================================================
   frontend:
     build:
       context: .
@@ -52,4 +98,3 @@ networks:
 volumes:
   tablechat-data:
     driver: local
-

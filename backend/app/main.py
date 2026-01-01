@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -7,15 +8,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import router as v1_router
-from app.config import settings
+from app.config import ConfigurationError, print_config_summary, settings, validate_config
 from app.db.sqlite import db_manager
 from app.services.ssh_tunnel import ssh_tunnel_manager
 from app.services.tokenizer import initialize_jieba
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan handler."""
+    # Startup: Validate configuration
+    try:
+        validate_config()
+        print_config_summary()
+    except ConfigurationError as e:
+        logger.warning(f"配置警告:\n{e}")
+        # Don't fail startup - allow running without LLM for development
+    
     # Startup: Initialize jieba dictionary (preload for better performance)
     initialize_jieba()
     # Startup: Initialize database schema
