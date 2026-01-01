@@ -52,7 +52,7 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({ message }) => {
           display: 'flex',
           alignItems: 'flex-start',
           gap: 8,
-          maxWidth: '85%',
+          maxWidth: '95%',
           flexDirection: isUser ? 'row-reverse' : 'row',
         }}
       >
@@ -78,6 +78,8 @@ export const AgentMessage: React.FC<AgentMessageProps> = ({ message }) => {
             borderRadius: 12,
             borderTopLeftRadius: isUser ? 12 : 4,
             borderTopRightRadius: isUser ? 4 : 12,
+            overflow: 'hidden',
+            minWidth: 0, // 确保 flex 子元素可以收缩
           }}
         >
           {!isTool && message.content && (

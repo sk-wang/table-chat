@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import hljs from 'highlight.js/lib/core';
 // Import common languages for highlighting
@@ -73,13 +73,22 @@ const renderer = new marked.Renderer();
 renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
   const language = lang || '';
   const highlighted = highlightCode(text, language);
-  
+
   // Special styling for SQL
   const isSql = language.toLowerCase() === 'sql';
   const extraClass = isSql ? 'sql-code-block' : '';
   const langLabel = language ? `<span class="code-lang-label">${language.toUpperCase()}</span>` : '';
-  
-  return `<div class="markdown-code-block ${extraClass}">${langLabel}<pre><code class="hljs">${highlighted}</code></pre></div>`;
+
+  // 复制按钮 - data-code 属性存储原始代码
+  const copyBtn = `<button class="code-copy-btn" data-code="${escapeHtml(text).replace(/"/g, '&quot;')}">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+    <span class="copy-text">复制</span>
+  </button>`;
+
+  return `<div class="markdown-code-block ${extraClass}">${langLabel}${copyBtn}<pre><code class="hljs">${highlighted}</code></pre></div>`;
 };
 
 // Custom inline code rendering
@@ -108,6 +117,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className = '',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const html = useMemo(() => {
     try {
       const rawHtml = marked.parse(content) as string;
@@ -118,8 +129,61 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     }
   }, [content]);
 
+  // 添加复制按钮点击事件
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleCopyClick = async (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest('.code-copy-btn') as HTMLButtonElement;
+      if (!btn) return;
+
+      const code = btn.dataset.code || '';
+      const textSpan = btn.querySelector('.copy-text');
+
+      try {
+        await navigator.clipboard.writeText(code);
+        btn.classList.add('copied');
+        if (textSpan) textSpan.textContent = '已复制';
+
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          if (textSpan) textSpan.textContent = '复制';
+        }, 2000);
+      } catch {
+        // 降级方案：使用传统方式
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          btn.classList.add('copied');
+          if (textSpan) textSpan.textContent = '已复制';
+          setTimeout(() => {
+            btn.classList.remove('copied');
+            if (textSpan) textSpan.textContent = '复制';
+          }, 2000);
+        } catch {
+          if (textSpan) textSpan.textContent = '失败';
+          setTimeout(() => {
+            if (textSpan) textSpan.textContent = '复制';
+          }, 2000);
+        }
+        document.body.removeChild(textarea);
+      }
+    };
+
+    container.addEventListener('click', handleCopyClick);
+    return () => container.removeEventListener('click', handleCopyClick);
+  }, [html]);
+
   return (
     <div
+      ref={containerRef}
       className={`markdown-content ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />

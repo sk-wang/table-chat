@@ -629,8 +629,9 @@
   margin: 12px 0;
   overflow: hidden;
   position: relative;
-  /* 关键：使用 calc 限制宽度在消息气泡内 */
-  max-width: calc(100% - 1px);
+  /* 宽度约束：确保不超出父容器 */
+  max-width: 100%;
+  width: 100%;
   box-sizing: border-box;
 }
 
@@ -639,6 +640,26 @@
   padding: 0;
   overflow-x: auto;
   background: #2b2b2b;
+  /* 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: #515151 transparent;
+}
+
+.markdown-code-block pre::-webkit-scrollbar {
+  height: 6px;
+}
+
+.markdown-code-block pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-code-block pre::-webkit-scrollbar-thumb {
+  background: #515151;
+  border-radius: 3px;
+}
+
+.markdown-code-block pre::-webkit-scrollbar-thumb:hover {
+  background: #6a6a6a;
 }
 
 .markdown-code-block code {
@@ -676,6 +697,49 @@
 .markdown-code-block.sql-code-block .code-lang-label {
   color: #629755;
   background: rgba(98, 151, 85, 0.15);
+}
+
+/* Copy button for code blocks */
+.code-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #a9b7c6;
+  background: #3c3f41;
+  border: 1px solid #515151;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  z-index: 10;
+}
+
+.markdown-code-block:hover .code-copy-btn {
+  opacity: 1;
+}
+
+.code-copy-btn:hover {
+  background: #515151;
+}
+
+.code-copy-btn.copied {
+  color: #629755;
+  border-color: #629755;
+}
+
+.code-copy-btn.copied:hover {
+  background: rgba(98, 151, 85, 0.15);
+}
+
+/* 当有语言标签时，复制按钮位置调整 */
+.markdown-code-block:has(.code-lang-label) .code-copy-btn {
+  top: 28px;
 }
 
 /* =====================================================
