@@ -18,6 +18,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - TypeScript 5.x + React, Ant Design, 浏览器 File API (014-ssh-key-file-picker)
 - N/A（前端文件读取，不涉及持久化） (014-ssh-key-file-picker)
 - TypeScript 5.x (前端), Python 3.13+ (后端) + React, Monaco Editor, sqlglot, sql-formatter (015-sql-formatter)
+- Python 3.13+ (uv 管理) + FastAPI, Pydantic, anthropic SDK (新增), openai SDK (保留) (018-unified-llm-api)
+- SQLite (元数据存储，无变更) (018-unified-llm-api)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -37,9 +39,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 018-unified-llm-api: Added Python 3.13+ (uv 管理) + FastAPI, Pydantic, anthropic SDK (新增), openai SDK (保留)
 - 017-llm-think-tag-support: Added Python 3.13+ (uv 管理) + FastAPI, OpenAI SDK, Pydantic
 - 015-sql-formatter: Added TypeScript 5.x (前端), Python 3.13+ (后端) + React, Monaco Editor, sqlglot, sql-formatter
-- 014-ssh-key-file-picker: Added TypeScript 5.x + React, Ant Design, 浏览器 File API
 
 
 <!-- MANUAL ADDITIONS START -->
