@@ -195,8 +195,8 @@ TableChat 的 **Agent 模式** 是核心功能，需要 LLM 具备强大的工�
 
 ```
 ┌─────────────┐                    ┌──────────────────┐                    ┌─────────────────┐
-│  TableChat  │   Anthropic API    │ claude-code-proxy │   Anthropic/      │   LLM 服务       │
-│   (后端)     │ ─────────────────> │      (代理)       │   OpenAI API     │ (Claude/vLLM等) │
+│  TableChat  │   Anthropic API    │ claude-code-proxy│   Anthropic/       │   LLM           │
+│  (后端）     │ ─────────────────> │      (代理）      │   OpenAI API       │   Claude/vLLM   │
 └─────────────┘                    └──────────────────┘ ─────────────────> └─────────────────┘
                                           ↑
                                    所有请求统一入口

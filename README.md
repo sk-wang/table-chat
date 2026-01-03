@@ -195,8 +195,8 @@ However, we understand that many users want to use other LLM services (like vLLM
 
 ```
 ┌─────────────┐                    ┌──────────────────┐                    ┌─────────────────┐
-│  TableChat  │   Anthropic API    │ claude-code-proxy │   Anthropic/      │   LLM Service   │
-│  (Backend)  │ ─────────────────> │     (Proxy)       │   OpenAI API     │ (Claude/vLLM)   │
+│  TableChat  │   Anthropic API    │ claude-code-proxy│   Anthropic/       │   LLM Service   │
+│  (Backend)  │ ─────────────────> │     (Proxy)      │   OpenAI API       │ (Claude/vLLM)   │
 └─────────────┘                    └──────────────────┘ ─────────────────> └─────────────────┘
                                           ↑
                                    Unified entry point
