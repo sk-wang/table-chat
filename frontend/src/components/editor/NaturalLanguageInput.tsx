@@ -36,8 +36,8 @@ export const NaturalLanguageInput: React.FC<NaturalLanguageInputProps> = ({
   if (llmUnavailable) {
     return (
       <Alert
-        message="AI 功能不可用"
-        description="LLM 服务未配置或不可用。请检查服务器配置中的 LLM_API_KEY 环境变量。您仍然可以使用 SQL 编辑器直接编写查询。"
+        message="AI Feature Unavailable"
+        description="LLM service is not configured or unavailable. Please check the LLM_API_KEY environment variable in the server configuration. You can still use the SQL editor to write queries directly."
         type="warning"
         showIcon
         icon={<RobotOutlined />}
@@ -52,7 +52,7 @@ export const NaturalLanguageInput: React.FC<NaturalLanguageInputProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <RobotOutlined style={{ fontSize: 18, color: '#80CBC4' }} />
           <Text strong style={{ color: '#a9b7c6' }}>
-            用自然语言描述你的查询需求
+            Describe your query requirements in natural language
           </Text>
         </div>
         
@@ -60,7 +60,7 @@ export const NaturalLanguageInput: React.FC<NaturalLanguageInputProps> = ({
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="例如：查询所有年龄大于18岁的用户，按注册时间倒序排列"
+          placeholder="Example: Query all users older than 18, sorted by registration time in descending order"
           autoSize={{ minRows: 2, maxRows: 4 }}
           disabled={disabled || loading}
           style={{
@@ -73,7 +73,7 @@ export const NaturalLanguageInput: React.FC<NaturalLanguageInputProps> = ({
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            按 Ctrl+Enter 生成 SQL
+            Press Ctrl+Enter to generate SQL
           </Text>
           <Button
             type="primary"
@@ -83,7 +83,7 @@ export const NaturalLanguageInput: React.FC<NaturalLanguageInputProps> = ({
             disabled={disabled || !prompt.trim()}
             style={{ background: '#80CBC4', borderColor: '#80CBC4', color: '#1a1a1a' }}
           >
-            生成 SQL
+            Generate SQL
           </Button>
         </div>
       </Space>

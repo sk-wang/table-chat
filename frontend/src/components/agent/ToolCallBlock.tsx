@@ -103,9 +103,9 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
   const getToolDisplayName = () => {
     switch (toolCall.name) {
       case 'query_database':
-        return '执行 SQL 查询';
+        return 'Execute SQL Query';
       case 'get_table_schema':
-        return '获取表结构';
+        return 'Get Table Schema';
       default:
         return toolCall.name;
     }
@@ -153,7 +153,7 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
         
         <Tag color={getStatusColor()} style={{ margin: 0 }}>
           {getStatusIcon()}{' '}
-          {toolCall.status === 'running' ? '执行中' : toolCall.status === 'completed' ? '完成' : '错误'}
+          {toolCall.status === 'running' ? 'Running' : toolCall.status === 'completed' ? 'Completed' : 'Error'}
         </Tag>
         
         {toolCall.durationMs !== undefined && toolCall.status !== 'running' && (
@@ -178,9 +178,9 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
               }}
             >
               <Text style={{ fontSize: 11, textTransform: 'uppercase', color: '#808080' }}>
-                输入参数
+                Input Parameters
               </Text>
-              <Tooltip title={copiedInput ? '已复制!' : '复制'}>
+              <Tooltip title={copiedInput ? 'Copied!' : 'Copy'}>
                 <Button
                   type="text"
                   size="small"
@@ -209,9 +209,9 @@ export const ToolCallBlock: React.FC<ToolCallBlockProps> = ({ toolCall, compact 
                 }}
               >
                 <Text style={{ fontSize: 11, textTransform: 'uppercase', color: '#808080' }}>
-                  执行结果
+                  Execution Result
                 </Text>
-                <Tooltip title={copiedOutput ? '已复制!' : '复制'}>
+                <Tooltip title={copiedOutput ? 'Copied!' : 'Copy'}>
                   <Button
                     type="text"
                     size="small"

@@ -36,7 +36,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
    */
   const handleExport = async (format: ExportFormat) => {
     if (!result || !result.rows || result.rows.length === 0) {
-      message.warning('没有可导出的数据');
+      message.warning('No data available to export');
       return;
     }
 
@@ -50,10 +50,10 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
         result.rows
       );
 
-      message.success(`导出 ${format.toUpperCase()} 成功`);
+      message.success(`Exported ${format.toUpperCase()} successfully`);
     } catch (error) {
       console.error('Export failed:', error);
-      message.error(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      message.error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setExporting(false);
     }
@@ -63,19 +63,19 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
   const menuItems: MenuProps['items'] = [
     {
       key: 'csv',
-      label: '导出 CSV',
+      label: 'Export CSV',
       icon: <FileTextOutlined />,
       onClick: () => handleExport('csv'),
     },
     {
       key: 'json',
-      label: '导出 JSON',
+      label: 'Export JSON',
       icon: <FileTextOutlined />,
       onClick: () => handleExport('json'),
     },
     {
       key: 'xlsx',
-      label: '导出 XLSX',
+      label: 'Export XLSX',
       icon: <FileExcelOutlined />,
       onClick: () => handleExport('xlsx'),
     },
@@ -92,7 +92,7 @@ export const ExportButton: React.FC<ExportButtonProps> = ({
         disabled={isDisabled}
         loading={exporting}
       >
-        导出
+        Export
       </Button>
     </Dropdown>
   );

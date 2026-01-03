@@ -48,7 +48,7 @@ export function QueryHistoryTab({ dbName, onSelectHistory, refreshTrigger }: Que
       setNextCursor(response.nextCursor);
       setInitialized(true);
     } catch (error) {
-      message.error(`加载历史记录失败: ${error}`);
+      message.error(`Failed to load history: ${error}`);
     } finally {
       setLoading(false);
       isFirstLoadRef.current = false;
@@ -72,7 +72,7 @@ export function QueryHistoryTab({ dbName, onSelectHistory, refreshTrigger }: Que
       setHasMore(false);
       setNextCursor(null);
     } catch (error) {
-      message.error(`搜索失败: ${error}`);
+      message.error(`Search failed: ${error}`);
     } finally {
       setSearchLoading(false);
     }
@@ -122,8 +122,8 @@ export function QueryHistoryTab({ dbName, onSelectHistory, refreshTrigger }: Que
 
   const isSearchMode = searchQuery.trim().length > 0;
   const emptyText = isSearchMode
-    ? `未找到包含"${searchQuery}"的历史记录`
-    : '暂无执行历史，执行查询后将在这里显示';
+    ? `No history found containing "${searchQuery}"`
+    : 'No execution history yet. Executed queries will be displayed here';
 
   // Show table loading state
   // 1. searchLoading is always shown
@@ -147,7 +147,7 @@ export function QueryHistoryTab({ dbName, onSelectHistory, refreshTrigger }: Que
             onClick={handleRefresh}
             loading={loading && !searchLoading}
           >
-            刷新
+            Refresh
           </Button>
         </Space>
       </div>
@@ -166,7 +166,7 @@ export function QueryHistoryTab({ dbName, onSelectHistory, refreshTrigger }: Que
       {hasMore && !isSearchMode && (
         <div style={{ padding: '8px 16px', borderTop: '1px solid #f0f0f0', textAlign: 'center' }}>
           <Button onClick={() => loadHistory(false, true)} loading={loading} size="small">
-            加载更多
+            Load More
           </Button>
         </div>
       )}

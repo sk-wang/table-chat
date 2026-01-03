@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.config import settings
 from app.services.agent_tools import ANTHROPIC_TOOLS, execute_tool
+from app.utils.language_detection import detect_language
 
 if TYPE_CHECKING:
     from app.models.agent import ConversationTurn
@@ -17,8 +18,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# System prompt for the SQL assistant agent
-AGENT_SYSTEM_PROMPT = """你是一个 SQL 助手，帮助用户探索数据库并生成 SQL 查询。
+# Chinese system prompt for the SQL assistant agent
+AGENT_SYSTEM_PROMPT_ZH = """你是一个 SQL 助手，帮助用户探索数据库并生成 SQL 查询。
 
 你有以下三个工具可用：
 1. `list_tables` - 列出数据库中所有表的名称（先用这个探索数据库）
@@ -41,7 +42,74 @@ AGENT_SYSTEM_PROMPT = """你是一个 SQL 助手，帮助用户探索数据库�
 2. 将完整的 SQL 语句放在 ```sql 代码块中
 3. 格式化使其易于阅读
 
-请用中文回复用户的中文请求。"""
+请用中文回复用户。"""
+
+# English system prompt for the SQL assistant agent
+AGENT_SYSTEM_PROMPT_EN = """You are a SQL assistant that helps users explore databases and generate SQL queries.
+
+You have access to three tools:
+1. `list_tables` - List all table names in the database (use this first to explore the database)
+2. `get_table_schema` - Get detailed schema of a specific table (column names, types, comments)
+3. `query_database` - Execute read-only SQL queries (only SELECT, DESCRIBE, SHOW, EXPLAIN are supported)
+
+Workflow:
+1. First use `list_tables` to see what tables are available
+2. Then use `get_table_schema` to understand the structure of the tables you need
+3. If needed, use `query_database` to execute sample queries
+4. Finally, generate SQL that meets the user's requirements
+
+Important notes:
+- `query_database` can only execute read-only queries
+- However, you can generate DDL statements (like CREATE INDEX, ALTER TABLE) as final answers
+- Users will execute these DDL statements in other tools
+
+When you're ready to provide the final SQL:
+1. Clearly explain what the SQL does
+2. Put the complete SQL statement in a ```sql code block
+3. Format it for readability
+
+Please respond in English."""
+
+
+# Messages dictionary for bilingual support
+MESSAGES = {
+    "zh": {
+        "analyzing": "正在分析您的需求...",
+        "agent_not_configured": "Agent 服务未配置",
+        "set_api_key": "请设置 LLM_API_KEY 环境变量",
+        "client_not_installed": "Anthropic 客户端未安装",
+        "install_anthropic": "请运行 'pip install anthropic' 安装",
+        "api_error": "API 错误",
+        "max_turns_reached": "已达到最大交互轮次 ({max_turns})，请简化您的请求或重试。",
+        "task_cancelled": "任务已取消",
+    },
+    "en": {
+        "analyzing": "Analyzing your request...",
+        "agent_not_configured": "Agent service not configured",
+        "set_api_key": "Please set the LLM_API_KEY environment variable",
+        "client_not_installed": "Anthropic client not installed",
+        "install_anthropic": "Please run 'pip install anthropic' to install",
+        "api_error": "API error",
+        "max_turns_reached": "Maximum turns ({max_turns}) reached. Please simplify your request or try again.",
+        "task_cancelled": "Task cancelled",
+    },
+}
+
+
+def get_system_prompt(language: str) -> str:
+    """Get the system prompt for the specified language."""
+    if language == "zh":
+        return AGENT_SYSTEM_PROMPT_ZH
+    return AGENT_SYSTEM_PROMPT_EN
+
+
+def get_message(language: str, key: str, **kwargs: Any) -> str:
+    """Get a localized message for the specified language."""
+    messages = MESSAGES.get(language, MESSAGES["en"])
+    message = messages.get(key, MESSAGES["en"].get(key, key))
+    if kwargs:
+        return message.format(**kwargs)
+    return message
 
 
 class AgentService:
@@ -94,11 +162,15 @@ class AgentService:
         start_time = time.time()
         tool_calls_count = 0
 
+        # Detect language from user prompt
+        language = detect_language(prompt)
+        logger.info(f"Detected language: {language}")
+
         try:
             # Emit initial thinking event
             yield {
                 "event": "thinking",
-                "data": {"status": "analyzing", "message": "正在分析您的需求..."},
+                "data": {"status": "analyzing", "message": get_message(language, "analyzing")},
             }
 
             # Check if agent is configured (uses unified LLM configuration)
@@ -106,8 +178,8 @@ class AgentService:
                 yield {
                     "event": "error",
                     "data": {
-                        "error": "Agent 服务未配置",
-                        "detail": "请设置 LLM_API_KEY 环境变量",
+                        "error": get_message(language, "agent_not_configured"),
+                        "detail": get_message(language, "set_api_key"),
                     },
                 }
                 return
@@ -118,8 +190,8 @@ class AgentService:
                 yield {
                     "event": "error",
                     "data": {
-                        "error": "Anthropic 客户端未安装",
-                        "detail": "请运行 'pip install anthropic' 安装",
+                        "error": get_message(language, "client_not_installed"),
+                        "detail": get_message(language, "install_anthropic"),
                     },
                 }
                 return
@@ -151,7 +223,7 @@ class AgentService:
                     async with client.messages.stream(
                         model=settings.effective_model,
                         max_tokens=4096,
-                        system=AGENT_SYSTEM_PROMPT,
+                        system=get_system_prompt(language),
                         tools=ANTHROPIC_TOOLS,
                         messages=messages,
                     ) as stream:
@@ -201,7 +273,7 @@ class AgentService:
                     logger.exception(f"Anthropic API error: {api_error}")
                     yield {
                         "event": "error",
-                        "data": {"error": f"API 错误: {api_error}", "detail": None},
+                        "data": {"error": f"{get_message(language, 'api_error')}: {api_error}", "detail": None},
                     }
                     return
 
@@ -344,14 +416,14 @@ class AgentService:
                     "event": "message",
                     "data": {
                         "role": "assistant",
-                        "content": f"已达到最大交互轮次 ({max_turns})，请简化您的请求或重试。",
+                        "content": get_message(language, "max_turns_reached", max_turns=max_turns),
                     },
                 }
 
         except asyncio.CancelledError:
             yield {
                 "event": "error",
-                "data": {"error": "任务已取消", "detail": None},
+                "data": {"error": get_message(language, "task_cancelled"), "detail": None},
             }
             raise
 

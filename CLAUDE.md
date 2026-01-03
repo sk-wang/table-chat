@@ -22,6 +22,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - SQLite (元数据存储，无变更) (018-unified-llm-api)
 - TypeScript 5.x (前端), React 19 + React, marked (Markdown 解析), highlight.js (语法高亮), Ant Design (019-sql-display)
 - N/A（纯前端功能，不涉及存储） (019-sql-display)
+- Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design (020-i18n-readme)
+- SQLite (existing) (020-i18n-readme)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -41,9 +43,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 020-i18n-readme: Added Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design
 - 019-sql-display: Added TypeScript 5.x (前端), React 19 + React, marked (Markdown 解析), highlight.js (语法高亮), Ant Design
 - 018-unified-llm-api: Added Python 3.13+ (uv 管理) + FastAPI, Pydantic, anthropic SDK (新增), openai SDK (保留)
-- 017-llm-think-tag-support: Added Python 3.13+ (uv 管理) + FastAPI, OpenAI SDK, Pydantic
 
 
 <!-- MANUAL ADDITIONS START -->

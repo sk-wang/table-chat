@@ -139,7 +139,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
       {/* Collapsed state - just show toggle button */}
       {collapsed && (
         <div className="agent-sidebar-collapsed">
-          <Tooltip title="打开 AI Agent (⌘⇧A)" placement="left">
+          <Tooltip title="Open AI Agent (⌘⇧A)" placement="left">
             <Button
               type="text"
               icon={<RobotOutlined />}
@@ -160,7 +160,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
               <span>AI Agent</span>
             </div>
             <div className="agent-sidebar-actions">
-              <Tooltip title={isFullscreen ? '退出全屏' : '全屏'}>
+              <Tooltip title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
                 <Button
                   type="text"
                   size="small"
@@ -168,7 +168,7 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
                   onClick={toggleFullscreen}
                 />
               </Tooltip>
-              <Tooltip title="关闭 (⌘⇧A)">
+              <Tooltip title="Close (⌘⇧A)">
                 <Button
                   type="text"
                   size="small"

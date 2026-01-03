@@ -18,7 +18,7 @@ export function QueryHistoryList({
   items,
   loading,
   onSelectHistory,
-  emptyText = '暂无执行历史',
+  emptyText = 'No execution history',
   totalCount,
 }: QueryHistoryListProps) {
   // If we are loading and have no items, show a skeleton or at least no empty state
@@ -28,16 +28,16 @@ export function QueryHistoryList({
   const handleCopySQL = async (sql: string) => {
     try {
       await navigator.clipboard.writeText(sql);
-      message.success('SQL已复制到剪贴板');
+      message.success('SQL copied to clipboard');
     } catch {
-      message.error('复制失败');
+      message.error('Copy failed');
     }
   };
 
   // Define table columns
   const columns: ColumnsType<QueryHistoryItem> = [
     {
-      title: '序号',
+      title: 'No.',
       key: 'index',
       width: 60,
       align: 'center',
@@ -46,7 +46,7 @@ export function QueryHistoryList({
       ),
     },
     {
-      title: '执行时间',
+      title: 'Executed At',
       dataIndex: 'executedAt',
       key: 'executedAt',
       width: 120,
@@ -59,7 +59,7 @@ export function QueryHistoryList({
       ),
     },
     {
-      title: '数据库',
+      title: 'Database',
       dataIndex: 'dbName',
       key: 'dbName',
       width: 100,
@@ -82,7 +82,7 @@ export function QueryHistoryList({
               {sqlContent}
               <div style={{ marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '8px' }}>
                 <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: '11px' }}>
-                  <CopyOutlined style={{ marginRight: 4 }} />双击复制SQL
+                  <CopyOutlined style={{ marginRight: 4 }} />Double-click to copy SQL
                 </Text>
               </div>
             </div>
@@ -107,7 +107,7 @@ export function QueryHistoryList({
       ),
     },
     {
-      title: '状态',
+      title: 'Status',
       key: 'status',
       width: 70,
       align: 'center',
@@ -117,12 +117,12 @@ export function QueryHistoryList({
           color="success"
           style={{ margin: 0 }}
         >
-          成功
+          Success
         </Tag>
       ),
     },
     {
-      title: '行数',
+      title: 'Rows',
       dataIndex: 'rowCount',
       key: 'rowCount',
       width: 70,
@@ -132,7 +132,7 @@ export function QueryHistoryList({
       ),
     },
     {
-      title: '耗时',
+      title: 'Duration',
       dataIndex: 'executionTimeMs',
       key: 'executionTimeMs',
       width: 80,
@@ -144,7 +144,7 @@ export function QueryHistoryList({
       ),
     },
     {
-      title: '备注',
+      title: 'Note',
       dataIndex: 'naturalQuery',
       key: 'naturalQuery',
       width: 250, // 增加宽度以容纳更多文字
@@ -203,8 +203,8 @@ export function QueryHistoryList({
       footer={() => (
         <div style={{ textAlign: 'center', padding: '4px 0' }}>
           <Text type="secondary" style={{ fontSize: '12px' }}>
-            当前显示 {items.length} 条
-            {totalCount !== undefined && totalCount > items.length && ` / 共 ${totalCount} 条`}
+            Showing {items.length} {items.length === 1 ? 'item' : 'items'}
+            {totalCount !== undefined && totalCount > items.length && ` / Total ${totalCount} ${totalCount === 1 ? 'item' : 'items'}`}
           </Text>
         </div>
       )}

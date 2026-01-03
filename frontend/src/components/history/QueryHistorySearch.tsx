@@ -58,7 +58,7 @@ export function QueryHistorySearch({
 
   return (
     <Search
-      placeholder="搜索 SQL 或自然语言..."
+      placeholder="Search SQL or natural language..."
       allowClear
       enterButton={<SearchOutlined />}
       value={inputValue}
