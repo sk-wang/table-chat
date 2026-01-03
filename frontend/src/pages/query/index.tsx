@@ -306,9 +306,9 @@ export const QueryPage: React.FC = () => {
             response.result.columns,
             response.result.rows
           );
-          message.success(`已自动导出为 ${pendingExport.toUpperCase()}`);
+          message.success(`Auto-exported as ${pendingExport.toUpperCase()}`);
         } catch (exportError) {
-          message.error(`自动导出失败: ${exportError instanceof Error ? exportError.message : '未知错误'}`);
+          message.error(`Auto-export failed: ${exportError instanceof Error ? exportError.message : 'Unknown error'}`);
         }
       }
     } catch (err) {
@@ -348,7 +348,7 @@ export const QueryPage: React.FC = () => {
 
   const handleGenerateSQL = async (prompt: string) => {
     if (!selectedDatabase) {
-      message.error('请先选择数据库');
+      message.error('Please select a database first');
       return;
     }
 
@@ -375,13 +375,13 @@ export const QueryPage: React.FC = () => {
       
       // Check if export format was detected
       if (response.exportFormat) {
-        message.success(`SQL 生成成功！检测到导出意图，将在执行后自动导出为 ${response.exportFormat.toUpperCase()}`);
+        message.success(`SQL generated successfully! Export intent detected, will auto-export as ${response.exportFormat.toUpperCase()}`);
         
         // Store export format for auto-export after execution
         // We'll use a ref or state to track this
         sessionStorage.setItem('pendingExportFormat', response.exportFormat);
       } else {
-      message.success('SQL 生成成功！您可以检查并执行生成的查询。');
+      message.success('SQL generated successfully! You can review and execute the generated query.');
       }
 
     } catch (err) {
@@ -405,14 +405,14 @@ export const QueryPage: React.FC = () => {
     setQueryMode('sql');
     // Switch to results tab to prepare for execution
     setBottomPanelTab('results');
-    message.info('SQL 已复制到编辑器');
+    message.info('SQL copied to editor');
   };
 
   // Handle SQL generated from Agent sidebar
   const handleAgentSQLGenerated = useCallback((sql: string) => {
     setSqlQuery(sql);
     setQueryMode('sql');
-    message.success('SQL 已复制到编辑器');
+    message.success('SQL copied to editor');
   }, [message]);
 
   // Show welcome message if no databases
@@ -456,7 +456,7 @@ export const QueryPage: React.FC = () => {
       key: 'sql',
       label: (
         <span>
-          <CodeOutlined /> SQL 编辑器
+          <CodeOutlined /> SQL Editor
         </span>
       ),
       children: (
@@ -474,7 +474,7 @@ export const QueryPage: React.FC = () => {
       key: 'natural',
       label: (
         <span>
-          <RobotOutlined /> 自然语言
+          <RobotOutlined /> Natural Language
         </span>
       ),
       children: (
@@ -493,7 +493,7 @@ export const QueryPage: React.FC = () => {
       key: 'results',
       label: (
         <span>
-          <TableOutlined /> 查询结果
+          <TableOutlined /> Query Results
         </span>
       ),
       children: (
@@ -524,7 +524,7 @@ export const QueryPage: React.FC = () => {
       key: 'history',
       label: (
         <span>
-          <HistoryOutlined /> 执行历史
+          <HistoryOutlined /> Execution History
         </span>
       ),
       forceRender: true, // 关键：提前渲染并加载数据，避免首次切换闪烁
@@ -599,13 +599,13 @@ export const QueryPage: React.FC = () => {
                 {/* Show generated explanation if available */}
                 {generatedExplanation && queryMode === 'sql' && (
                   <Alert
-                    message="AI 生成的 SQL"
+                    message="AI Generated SQL"
                     description={
                       <div>
                         <Text style={{ color: '#a9b7c6' }}>{generatedExplanation}</Text>
                         <br />
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          请检查生成的查询，确认无误后点击"Execute"执行
+                          Please review the generated query and click "Execute" when ready
                         </Text>
                       </div>
                     }

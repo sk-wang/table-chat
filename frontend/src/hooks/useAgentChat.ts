@@ -55,7 +55,7 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
       return {
         ...state,
         status: 'thinking',
-        thinkingMessage: '正在分析您的需求...',
+        thinkingMessage: 'Analyzing your requirements...',
         thinkingStatus: 'analyzing',
         error: null,
         generatedSQL: null,
@@ -157,7 +157,7 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
       return {
         ...state,
         status: 'tool_running',
-        thinkingMessage: action.data.status === 'running' ? `正在执行 ${action.data.tool}...` : '',
+        thinkingMessage: action.data.status === 'running' ? `Executing ${action.data.tool}...` : '',
         streamingText: '',
         messages: newMessages,
       };
@@ -173,7 +173,7 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
               {
                 id: `sql-${Date.now()}`,
                 role: 'assistant',
-                content: `生成的 SQL:\n\`\`\`sql\n${action.sql}\n\`\`\`\n\n${action.explanation}`,
+                content: `Generated SQL:\n\`\`\`sql\n${action.sql}\n\`\`\`\n\n${action.explanation}`,
                 timestamp: Date.now(),
               },
             ]
@@ -356,7 +356,7 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
       timeoutRef.current = setTimeout(() => {
         if (abortControllerRef.current) {
           abortControllerRef.current.abort();
-          dispatch({ type: 'SET_ERROR', error: '请求超时，请重试。Agent 响应时间超过 2 分钟限制。' });
+          dispatch({ type: 'SET_ERROR', error: 'Request timeout, please try again. Agent response time exceeded the 2-minute limit.' });
         }
       }, TIMEOUT_MS);
     },

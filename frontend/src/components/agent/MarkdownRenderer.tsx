@@ -85,7 +85,7 @@ renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
     </svg>
-    <span class="copy-text">复制</span>
+    <span class="copy-text">Copy</span>
   </button>`;
 
   return `<div class="markdown-code-block ${extraClass}">${langLabel}${copyBtn}<pre><code class="hljs">${highlighted}</code></pre></div>`;
@@ -145,11 +145,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       try {
         await navigator.clipboard.writeText(code);
         btn.classList.add('copied');
-        if (textSpan) textSpan.textContent = '已复制';
+        if (textSpan) textSpan.textContent = 'Copied';
 
         setTimeout(() => {
           btn.classList.remove('copied');
-          if (textSpan) textSpan.textContent = '复制';
+          if (textSpan) textSpan.textContent = 'Copy';
         }, 2000);
       } catch {
         // 降级方案：使用传统方式
@@ -162,15 +162,15 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         try {
           document.execCommand('copy');
           btn.classList.add('copied');
-          if (textSpan) textSpan.textContent = '已复制';
+          if (textSpan) textSpan.textContent = 'Copied';
           setTimeout(() => {
             btn.classList.remove('copied');
-            if (textSpan) textSpan.textContent = '复制';
+            if (textSpan) textSpan.textContent = 'Copy';
           }, 2000);
         } catch {
-          if (textSpan) textSpan.textContent = '失败';
+          if (textSpan) textSpan.textContent = 'Failed';
           setTimeout(() => {
-            if (textSpan) textSpan.textContent = '复制';
+            if (textSpan) textSpan.textContent = 'Copy';
           }, 2000);
         }
         document.body.removeChild(textarea);

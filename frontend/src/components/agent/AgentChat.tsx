@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Input, Button, Alert } from 'antd';
-import { SendOutlined, StopOutlined, CopyOutlined, RobotOutlined } from '@ant-design/icons';
+import { SendOutlined, StopOutlined, RobotOutlined } from '@ant-design/icons';
 import { AgentMessage } from './AgentMessage';
 import { ThinkingIndicator } from './ThinkingIndicator';
 import { useAgentChat } from '../../hooks/useAgentChat';
@@ -30,12 +30,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     streamingText,
     thinkingMessage,
     thinkingStatus,
-    generatedSQL,
     error,
     isProcessing,
     sendMessage,
     cancel,
-    copyToEditor,
     clearError,
   } = useAgentChat({ dbName, onSQLGenerated });
 
@@ -61,8 +59,8 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     return (
       <div className="agent-chat-container">
         <Alert
-          message="Agent 功能不可用"
-          description="Agent 服务未配置。请在后端设置 AGENT_API_KEY 环境变量。"
+          message="Agent Unavailable"
+          description="Agent service is not configured. Please set AGENT_API_KEY environment variable in the backend."
           type="warning"
           showIcon
           icon={<RobotOutlined />}
@@ -80,10 +78,10 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           <div className="agent-empty-state">
             <RobotOutlined className="agent-empty-icon" />
             <div className="agent-empty-title">
-              输入您的需求，Agent 将探索数据库并生成 SQL
+              Enter your requirements, and Agent will explore the database and generate SQL
             </div>
             <div className="agent-empty-hint">
-              例如：帮我查询订单总金额 / 给用户表加个索引
+              Example: Help me query total order amount / Add an index to the user table
             </div>
           </div>
         )}
@@ -115,7 +113,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
       {/* Error Display */}
       {error && (
         <Alert
-          message="错误"
+          message="Error"
           description={error}
           type="error"
           showIcon
@@ -125,19 +123,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
         />
       )}
 
-      {/* Copy to Editor Button */}
-      {generatedSQL && (
-        <div className="sql-action-button" style={{ padding: '0 12px 12px' }}>
-          <Button
-            type="primary"
-            icon={<CopyOutlined />}
-            onClick={copyToEditor}
-            block
-          >
-            复制到 SQL 编辑器
-          </Button>
-        </div>
-      )}
+      {/* Copy to Editor Button - Removed per user story 2 */}
 
       {/* Input Area */}
       <div className="agent-input-area">
@@ -145,14 +131,14 @@ export const AgentChat: React.FC<AgentChatProps> = ({
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="描述您的需求..."
+          placeholder="Describe your requirements..."
           autoSize={{ minRows: 2, maxRows: 4 }}
           disabled={disabled || isProcessing}
         />
 
         <div className="agent-input-actions">
           <span className="agent-input-hint">
-            ⌘+Enter 发送
+            ⌘+Enter to send
           </span>
           <div className="agent-input-buttons">
             {isProcessing && (
@@ -162,7 +148,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
                 icon={<StopOutlined />}
                 onClick={cancel}
               >
-                取消
+                Cancel
               </Button>
             )}
             <Button
@@ -173,7 +159,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
               loading={isProcessing}
               disabled={disabled || !prompt.trim() || isProcessing}
             >
-              发送
+              Send
             </Button>
           </div>
         </div>

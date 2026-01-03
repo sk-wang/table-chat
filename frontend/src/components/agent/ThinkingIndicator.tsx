@@ -49,7 +49,7 @@ const pulseKeyframes = `
 
 export const ThinkingIndicator: React.FC<ThinkingIndicatorProps> = ({ data, message }) => {
   const status = data?.status || 'analyzing';
-  const displayMessage = message || data?.message || '思考中...';
+  const displayMessage = message || data?.message || 'Thinking...';
 
   const getStatusIcon = () => {
     switch (status) {

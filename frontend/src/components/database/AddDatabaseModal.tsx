@@ -63,7 +63,7 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
     
     if (result.success) {
       form.setFieldValue('sshPrivateKey', result.content);
-      message.success(`已加载: ${file.name}`);
+      message.success(`Loaded: ${file.name}`);
     } else {
       message.error(result.error.message);
     }
@@ -264,11 +264,11 @@ export const AddDatabaseModal: React.FC<AddDatabaseModalProps> = ({
             valuePropName="checked"
             extra={
               <Text type="secondary" style={{ fontSize: 12 }}>
-                仅在遇到 SSL 协议兼容性问题时使用
+                Only use when encountering SSL protocol compatibility issues
               </Text>
             }
           >
-            <Checkbox>禁用 SSL</Checkbox>
+            <Checkbox>Disable SSL</Checkbox>
           </Form.Item>
         )}
 
