@@ -17,6 +17,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@monaco-editor/react": "^4.7.0",
+    "monaco-editor": "^0.52.0",
     "@refinedev/antd": "^6.0.3",
     "@refinedev/core": "^5.0.7",
     "@refinedev/react-router": "^2.0.3",

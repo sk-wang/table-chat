@@ -24,6 +24,10 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - N/A（纯前端功能，不涉及存储） (019-sql-display)
 - Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design (020-i18n-readme)
 - SQLite (existing) (020-i18n-readme)
+- Python 3.13+ (uv 管理) / TypeScript 5.9+ (021-sql-editor-enhance)
+- SQLite（元数据缓存，现有功能） (021-sql-editor-enhance)
+- Python 3.13+ (uv) / TypeScript 5.9+ (021-sql-editor-enhance)
+- SQLite (metadata caching), localStorage (frontend schema cache) (021-sql-editor-enhance)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -43,9 +47,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 021-sql-editor-enhance: Added Python 3.13+ (uv) / TypeScript 5.9+
+- 021-sql-editor-enhance: Added Python 3.13+ (uv 管理) / TypeScript 5.9+
 - 020-i18n-readme: Added Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design
-- 019-sql-display: Added TypeScript 5.x (前端), React 19 + React, marked (Markdown 解析), highlight.js (语法高亮), Ant Design
-- 018-unified-llm-api: Added Python 3.13+ (uv 管理) + FastAPI, Pydantic, anthropic SDK (新增), openai SDK (保留)
 
 
 <!-- MANUAL ADDITIONS START -->

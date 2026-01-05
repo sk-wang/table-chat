@@ -74,7 +74,7 @@ const CommentText: React.FC<{ comment: string | undefined | null }> = ({ comment
   );
 };
 
-export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
+const DatabaseSidebarComponent: React.FC<DatabaseSidebarProps> = ({
   metadata,
   metadataLoading,
   onTableSelect,
@@ -663,3 +663,6 @@ export const DatabaseSidebar: React.FC<DatabaseSidebarProps> = ({
     </div>
   );
 };
+
+// Memoize to prevent unnecessary re-renders when SQL query changes
+export const DatabaseSidebar = React.memo(DatabaseSidebarComponent);

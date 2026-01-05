@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Typography, Alert, Tabs, Layout, App } from 'antd';
 import { CodeOutlined, RobotOutlined, HistoryOutlined, TableOutlined } from '@ant-design/icons';
-import { SqlEditor } from '../../components/editor/SqlEditor';
+import { SqlEditor, type SqlEditorRef } from '../../components/editor/SqlEditor';
 import { QueryToolbar } from '../../components/editor/QueryToolbar';
 import { QueryResultTable } from '../../components/results/QueryResultTable';
 import { NaturalLanguageInput } from '../../components/editor/NaturalLanguageInput';
@@ -12,6 +12,7 @@ import { QueryHistoryTab } from '../../components/history';
 import { ExportButton } from '../../components/export';
 import { useDatabase } from '../../contexts/DatabaseContext';
 import { apiClient } from '../../services/api';
+import { parseTableReferences } from '../../components/editor/TableReferenceParser';
 import {
   getTableListCache,
   setTableListCache,
@@ -30,7 +31,10 @@ type QueryMode = 'sql' | 'natural';
 export const QueryPage: React.FC = () => {
   // Ant Design App context for message API
   const { message } = App.useApp();
-  
+
+  // SQL Editor ref for triggering autocomplete
+  const sqlEditorRef = useRef<SqlEditorRef>(null);
+
   // Use global database context
   const { databases, selectedDatabase, loading: loadingDatabases } = useDatabase();
   
@@ -38,18 +42,20 @@ export const QueryPage: React.FC = () => {
   const [tableSummaries, setTableSummaries] = useState<TableSummary[] | null>(null);
   const [tableDetails, setTableDetails] = useState<Map<string, TableMetadata>>(new Map());
   const [metadataLoading, setMetadataLoading] = useState(false);
-  
-  // Convert to TableMetadata[] for backward compatibility
-  const metadata: TableMetadata[] | null = tableSummaries
-    ? tableSummaries.map(summary => {
-        const key = `${summary.schemaName}.${summary.tableName}`;
-        const details = tableDetails.get(key);
-        return details || {
-          ...summary,
-          columns: [],
-        };
-      })
-    : null;
+
+  // Convert to TableMetadata[] for backward compatibility - memoized to prevent re-renders
+  const metadata: TableMetadata[] | null = useMemo(() => {
+    if (!tableSummaries) return null;
+
+    return tableSummaries.map(summary => {
+      const key = `${summary.schemaName}.${summary.tableName}`;
+      const details = tableDetails.get(key);
+      return details || {
+        ...summary,
+        columns: [],
+      };
+    });
+  }, [tableSummaries, tableDetails]);
   
   // Query state
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM ');
@@ -137,6 +143,15 @@ export const QueryPage: React.FC = () => {
         })),
       };
       setTableDetails(prev => new Map(prev).set(key, details));
+
+      // Trigger autocomplete refresh after loading from cache
+      // Increased timeout to 500ms to ensure React state updates have propagated
+      console.log('[LoadDetails] Cache hit, scheduling triggerSuggest in 500ms');
+      setTimeout(() => {
+        console.log('[LoadDetails] Calling triggerSuggest after cache load, ref:', sqlEditorRef.current !== null);
+        sqlEditorRef.current?.triggerSuggest();
+      }, 500);
+
       return;
     }
     console.log('[Cache] Table details miss for', key);
@@ -154,12 +169,41 @@ export const QueryPage: React.FC = () => {
       })));
 
       setTableDetails(prev => new Map(prev).set(key, details));
+
+      // Trigger autocomplete refresh after loading from API
+      // Increased timeout to 500ms to ensure React state updates have propagated
+      console.log('[LoadDetails] API call complete, scheduling triggerSuggest in 500ms');
+      setTimeout(() => {
+        console.log('[LoadDetails] Calling triggerSuggest after API load, ref:', sqlEditorRef.current !== null);
+        sqlEditorRef.current?.triggerSuggest();
+      }, 500);
     } catch (err) {
       console.error(`Failed to load table details for ${key}:`, err);
     }
   }, [selectedDatabase, tableDetails]);
 
-  const handleRefreshMetadata = async () => {
+  // Auto-preload table columns when tables are referenced in FROM clause
+  useEffect(() => {
+    if (!selectedDatabase || !tableSummaries || !sqlQuery) return;
+
+    // Parse table references from SQL query
+    try {
+      const tableRefs = parseTableReferences(sqlQuery);
+
+      // Preload columns for each referenced table
+      tableRefs.forEach(ref => {
+        const table = tableSummaries.find(t => t.tableName === ref.tableName);
+        if (table) {
+          loadTableDetails(table.schemaName, ref.tableName);
+        }
+      });
+    } catch (error) {
+      // Silently ignore parsing errors - SQL might be incomplete
+      console.debug('[Preload] SQL parsing error (expected for incomplete SQL):', error);
+    }
+  }, [sqlQuery, selectedDatabase, tableSummaries, loadTableDetails]);
+
+  const handleRefreshMetadata = useCallback(async () => {
     if (!selectedDatabase) return;
 
     try {
@@ -181,16 +225,16 @@ export const QueryPage: React.FC = () => {
     } finally {
       setMetadataLoading(false);
     }
-  };
+  }, [selectedDatabase, message]);
 
-  const handleTableSelect = (schemaName: string, tableName: string) => {
+  const handleTableSelect = useCallback((schemaName: string, tableName: string) => {
     const sql = `SELECT * FROM ${schemaName}.${tableName} LIMIT 100`;
     setSqlQuery(sql);
     setQueryMode('sql');
     message.info(`Generated SELECT for ${tableName}`);
     // Also load table details for column comments
     loadTableDetails(schemaName, tableName);
-  };
+  }, [message, loadTableDetails]);
 
   // Get default schema for current database
   // For PostgreSQL: 'public', for MySQL: the database name (first schema from tableSummaries)
@@ -462,10 +506,41 @@ export const QueryPage: React.FC = () => {
       children: (
         <div style={{ marginBottom: 16 }}>
           <SqlEditor
+            ref={sqlEditorRef}
             value={sqlQuery}
             onChange={setSqlQuery}
             onExecute={handleExecute}
             onFormat={handleFormat}
+            schemaData={
+              tableSummaries
+                ? {
+                    tables: tableSummaries,
+                    getTableColumns: (tableName: string) => {
+                      // Find schema for this table
+                      const table = tableSummaries.find(t => t.tableName === tableName);
+                      if (!table) {
+                        console.log('[getTableColumns] Table not found in summaries:', tableName);
+                        return undefined;
+                      }
+
+                      const key = `${table.schemaName}.${tableName}`;
+                      const details = tableDetails.get(key);
+
+                      // Trigger load if not yet loaded
+                      if (!details && !metadataLoading) {
+                        console.log('[getTableColumns] Table details not loaded, triggering load for:', key);
+                        loadTableDetails(table.schemaName, tableName);
+                      } else if (details) {
+                        console.log('[getTableColumns] Table details already loaded for:', key, 'columns:', details.columns.length);
+                      } else {
+                        console.log('[getTableColumns] Details missing but metadata loading in progress for:', key);
+                      }
+
+                      return details?.columns;
+                    },
+                  }
+                : undefined
+            }
           />
         </div>
       ),
