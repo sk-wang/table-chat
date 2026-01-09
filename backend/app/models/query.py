@@ -14,6 +14,12 @@ class QueryRequest(CamelModel):
     natural_query: str | None = Field(
         None, description="Natural language description (if SQL was generated from NL)"
     )
+    timeout_seconds: int = Field(
+        30,
+        ge=10,
+        le=300,
+        description="Query execution timeout in seconds (10-300, default: 30)",
+    )
 
 
 class QueryResult(CamelModel):

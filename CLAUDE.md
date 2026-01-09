@@ -1,6 +1,6 @@
 # tableChat Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2025-12-28
+Auto-generated from all feature plans. Last updated: 2026-01-09
 
 ## Active Technologies
 - Python 3.13+ (uv) / TypeScript 5.x + FastAPI (后端) / React + Refine 5 + Ant Design (前端) (003-table-search)
@@ -24,6 +24,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-28
 - N/A（纯前端功能，不涉及存储） (019-sql-display)
 - Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design (020-i18n-readme)
 - SQLite (existing) (020-i18n-readme)
+- TypeScript 5.9+ (Frontend), Python 3.13+ (Backend) + Monaco Editor (decorations API), React 19 hooks (useMemo, useCallback), localStorage API, asyncio.wait_for (021-single-sql-execution)
+- SQLite (existing metadata store, no schema changes needed for this feature) (021-single-sql-execution)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -43,9 +45,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 021-single-sql-execution: Added SQLite (existing metadata store, no schema changes needed for this feature)
 - 020-i18n-readme: Added Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design
 - 019-sql-display: Added TypeScript 5.x (前端), React 19 + React, marked (Markdown 解析), highlight.js (语法高亮), Ant Design
-- 018-unified-llm-api: Added Python 3.13+ (uv 管理) + FastAPI, Pydantic, anthropic SDK (新增), openai SDK (保留)
 
 
 <!-- MANUAL ADDITIONS START -->

@@ -1,0 +1,148 @@
+/**
+ * CSS Module for SQL Editor statement highlighting
+ * Feature: 021-single-sql-execution
+ */
+
+/* Active statement highlighting - shown when cursor is within a statement */
+.activeSqlStatement {
+  background-color: rgba(135, 206, 250, 0.15) !important; /* Light sky blue with transparency */
+  border: 1px solid rgba(135, 206, 250, 0.4);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(135, 206, 250, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+/* Active statement highlighting - dark theme support */
+:global(.dark) .activeSqlStatement {
+  background-color: rgba(30, 144, 255, 0.1) !important; /* Dodger blue with low opacity */
+  border: 1px solid rgba(30, 144, 255, 0.3);
+  box-shadow: 0 0 0 1px rgba(30, 144, 255, 0.15);
+}
+
+/* Error statement highlighting - shown when statement has execution error */
+.errorSqlStatement {
+  background-color: rgba(255, 99, 71, 0.1) !important; /* Tomato red with transparency */
+  border: 1px solid rgba(255, 99, 71, 0.3);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 99, 71, 0.2);
+}
+
+/* Error statement highlighting - dark theme support */
+:global(.dark) .errorSqlStatement {
+  background-color: rgba(220, 20, 60, 0.15) !important; /* Crimson with low opacity */
+  border: 1px solid rgba(220, 20, 60, 0.4);
+  box-shadow: 0 0 0 1px rgba(220, 20, 60, 0.2);
+}
+
+/* Hover effect for active statement */
+.activeSqlStatement:hover {
+  background-color: rgba(135, 206, 250, 0.2) !important;
+  border-color: rgba(135, 206, 250, 0.5);
+}
+
+:global(.dark) .activeSqlStatement:hover {
+  background-color: rgba(30, 144, 255, 0.15) !important;
+  border-color: rgba(30, 144, 255, 0.4);
+}
+
+/* Monaco editor container styling */
+.sqlEditorContainer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:global(.dark) .sqlEditorContainer {
+  border-color: #434343;
+}
+
+/* Loading overlay for query execution */
+.executionOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.executionOverlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+:global(.dark) .executionOverlay {
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Execution status indicator */
+.executionStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: white;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  color: #595959;
+}
+
+:global(.dark) .executionStatus {
+  background-color: #1f1f1f;
+  color: #d9d9d9;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+}
+
+/* Spinner animation */
+.spinner {
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1890ff;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+:global(.dark) .spinner {
+  border-color: #434343;
+  border-top-color: #40a9ff;
+}
+
+/* Performance optimization: Use GPU acceleration for animations */
+.activeSqlStatement,
+.errorSqlStatement,
+.executionOverlay {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Accessibility: Focus visible for keyboard navigation */
+.sqlEditorContainer:focus-within {
+  outline: 2px solid #1890ff;
+  outline-offset: 2px;
+}
+
+:global(.dark) .sqlEditorContainer:focus-within {
+  outline-color: #40a9ff;
+}

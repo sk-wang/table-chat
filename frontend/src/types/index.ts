@@ -20,6 +20,7 @@ export interface DatabaseCreateRequest {
 export interface QueryRequest {
   sql: string;
   naturalQuery?: string;
+  timeoutSeconds?: number; // Query timeout in seconds (10-300, default: 30)
 }
 
 export interface NaturalQueryRequest {

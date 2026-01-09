@@ -1,5 +1,6 @@
 """Query execution API endpoints."""
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, status
@@ -32,22 +33,26 @@ router = APIRouter(prefix="/dbs", tags=["Query"])
             "description": "SQL syntax error or non-SELECT statement",
         },
         404: {"model": ErrorResponse, "description": "Database not found"},
+        408: {"model": ErrorResponse, "description": "Query execution timeout"},
         503: {"model": ErrorResponse, "description": "Query execution failed"},
     },
     summary="Execute SQL query",
 )
 async def execute_query(name: str, request: QueryRequest) -> QueryResponse:
     """
-    Execute SQL SELECT query against a database.
-    
+    Execute SQL SELECT query against a database with configurable timeout.
+
     - Only SELECT statements are allowed
     - LIMIT 1000 is automatically added if no LIMIT clause exists
     - Returns query results as JSON
     - Records execution in query history
+    - Query timeout configurable (10-300 seconds, default: 30)
     """
     try:
         final_sql, columns, rows, execution_time_ms, truncated = (
-            await query_service.execute_validated_query(name, request.sql)
+            await query_service.execute_validated_query(
+                name, request.sql, request.timeout_seconds
+            )
         )
 
         # Record query history (fire and forget, don't block response)
@@ -79,6 +84,14 @@ async def execute_query(name: str, request: QueryRequest) -> QueryResponse:
         error_msg = str(e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg,
+        ) from e
+
+    except asyncio.TimeoutError as e:
+        # Query timeout error
+        error_msg = str(e)
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
             detail=error_msg,
         ) from e
 

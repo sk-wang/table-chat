@@ -30,10 +30,16 @@ type QueryMode = 'sql' | 'natural';
 export const QueryPage: React.FC = () => {
   // Ant Design App context for message API
   const { message } = App.useApp();
-  
+
   // Use global database context
   const { databases, selectedDatabase, loading: loadingDatabases } = useDatabase();
-  
+
+  // Debug: Log selectedDatabase changes
+  useEffect(() => {
+    console.log('[QueryPage] selectedDatabase changed:', selectedDatabase);
+    console.log('[QueryPage] databases:', databases);
+  }, [selectedDatabase, databases]);
+
   // Metadata state - use table summaries initially, load details on demand
   const [tableSummaries, setTableSummaries] = useState<TableSummary[] | null>(null);
   const [tableDetails, setTableDetails] = useState<Map<string, TableMetadata>>(new Map());
@@ -255,8 +261,21 @@ export const QueryPage: React.FC = () => {
     });
   };
 
-  const handleExecute = async () => {
-    if (!selectedDatabase || !sqlQuery.trim()) {
+  const handleExecute = async (sqlToExecute?: string) => {
+    console.log('[QueryPage] handleExecute called with:', sqlToExecute);
+
+    const actualSql = sqlToExecute || sqlQuery;
+    console.log('[QueryPage] Actual SQL to execute:', actualSql);
+
+    if (!selectedDatabase) {
+      console.warn('[QueryPage] Cannot execute: no database selected');
+      message.warning('请先选择一个数据库！');
+      return;
+    }
+
+    if (!actualSql.trim()) {
+      console.warn('[QueryPage] Cannot execute: empty SQL');
+      message.warning('请输入SQL语句！');
       return;
     }
 
@@ -266,28 +285,33 @@ export const QueryPage: React.FC = () => {
       setResult(null);
       setGeneratedExplanation(null);
 
+      console.log('[QueryPage] Executing query on database:', selectedDatabase);
+
       // Load metadata for tables in the query (for column comments)
-      const tables = extractTablesFromSQL(sqlQuery);
+      const tables = extractTablesFromSQL(actualSql);
       await Promise.all(
         tables.map(t => loadTableDetails(t.schema, t.table))
       );
 
       // Pass natural query if this SQL was generated from NL
-      const response = await apiClient.executeQuery(selectedDatabase, { 
-        sql: sqlQuery,
+      const response = await apiClient.executeQuery(selectedDatabase, {
+        sql: actualSql,
         naturalQuery: lastNaturalQuery ?? undefined,
       });
+
+      console.log('[QueryPage] Query executed successfully:', response);
 
       setResult(response.result);
       setExecutionTimeMs(response.executionTimeMs);
       // Update SQL in editor to show the actually executed SQL (with LIMIT if added)
-      if (response.sql !== sqlQuery) {
+      // Only update if we executed the full sqlQuery, not a single statement
+      if (!sqlToExecute && response.sql !== actualSql) {
         setSqlQuery(response.sql);
       }
-      
+
       // Clear natural query after execution (only record once)
       setLastNaturalQuery(null);
-      
+
       // Trigger history refresh
       setHistoryRefreshKey(prev => prev + 1);
       
@@ -359,8 +383,11 @@ export const QueryPage: React.FC = () => {
 
       const response = await apiClient.naturalLanguageQuery(selectedDatabase, { prompt });
 
-      // Set the generated SQL in the editor
-      setSqlQuery(response.generatedSql);
+      // Add the generated SQL at the beginning, don't overwrite existing SQL
+      const newSql = sqlQuery.trim()
+        ? `${response.generatedSql}\n\n${sqlQuery}`
+        : response.generatedSql;
+      setSqlQuery(newSql);
       
       // Store the natural language prompt for history recording
       setLastNaturalQuery(prompt);
@@ -464,7 +491,7 @@ export const QueryPage: React.FC = () => {
           <SqlEditor
             value={sqlQuery}
             onChange={setSqlQuery}
-            onExecute={handleExecute}
+            onExecuteStatement={handleExecute}
             onFormat={handleFormat}
           />
         </div>

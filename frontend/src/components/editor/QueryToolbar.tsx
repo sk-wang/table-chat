@@ -81,7 +81,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({
         <Button
           type="primary"
           icon={<PlayCircleOutlined />}
-          onClick={onExecute}
+          onClick={() => onExecute()}
           loading={executing}
           disabled={disabled || !selectedDatabase}
           style={{ background: '#589df6', borderColor: '#589df6' }}

@@ -1,5 +1,6 @@
 """SQL query execution service."""
 
+import asyncio
 from typing import Any
 
 import sqlglot
@@ -149,20 +150,22 @@ class QueryService:
         return modified_sql, True
 
     async def execute_query(
-        self, db_name: str, sql: str
+        self, db_name: str, sql: str, timeout_seconds: int = 30
     ) -> tuple[list[str], list[dict[str, Any]], int]:
         """
-        Execute SQL query against database.
+        Execute SQL query against database with timeout.
 
         Args:
             db_name: Database name
             sql: SQL query to execute
+            timeout_seconds: Query timeout in seconds (default: 30)
 
         Returns:
             Tuple of (column_names, rows, execution_time_ms)
 
         Raises:
             ValueError: If database not found
+            asyncio.TimeoutError: If query exceeds timeout
             Exception: If query execution fails
         """
         # Get database info
@@ -178,24 +181,34 @@ class QueryService:
         # Get SSH tunnel endpoint if configured
         tunnel_endpoint = await database_manager.get_tunnel_endpoint(db_name)
 
-        # Execute query (with tunnel if configured)
-        return await connector.execute_query(url, sql, tunnel_endpoint)
+        # Execute query with timeout (with tunnel if configured)
+        try:
+            return await asyncio.wait_for(
+                connector.execute_query(url, sql, tunnel_endpoint),
+                timeout=timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError(
+                f"Query execution exceeded timeout of {timeout_seconds} seconds"
+            )
 
     async def execute_validated_query(
-        self, db_name: str, sql: str
+        self, db_name: str, sql: str, timeout_seconds: int = 30
     ) -> tuple[str, list[str], list[dict[str, Any]], int, bool]:
         """
-        Parse, validate, and execute SQL query.
+        Parse, validate, and execute SQL query with timeout.
 
         Args:
             db_name: Database name
             sql: SQL query
+            timeout_seconds: Query timeout in seconds (default: 30)
 
         Returns:
             Tuple of (executed_sql, columns, rows, execution_time_ms, truncated)
 
         Raises:
             ValueError: If SQL is invalid or not a SELECT statement
+            asyncio.TimeoutError: If query exceeds timeout
         """
         # Get database info
         db = await database_manager.get_database(db_name)
@@ -219,10 +232,16 @@ class QueryService:
         # Get SSH tunnel endpoint if configured
         tunnel_endpoint = await database_manager.get_tunnel_endpoint(db_name)
 
-        # Execute query (with tunnel if configured)
-        columns, rows, execution_time_ms = await connector.execute_query(
-            url, final_sql, tunnel_endpoint
-        )
+        # Execute query with timeout (with tunnel if configured)
+        try:
+            columns, rows, execution_time_ms = await asyncio.wait_for(
+                connector.execute_query(url, final_sql, tunnel_endpoint),
+                timeout=timeout_seconds
+            )
+        except asyncio.TimeoutError:
+            raise asyncio.TimeoutError(
+                f"Query execution exceeded timeout of {timeout_seconds} seconds"
+            )
 
         return final_sql, columns, rows, execution_time_ms, truncated
 

@@ -1,0 +1,52 @@
+/**
+ * Global CSS for SQL Editor Monaco decorations
+ * These styles are applied to Monaco Editor decorations
+ * Feature: 021-single-sql-execution
+ */
+
+/* Active statement highlighting - Monaco decoration */
+.active-sql-statement {
+  background-color: rgba(135, 206, 250, 0.15) !important;
+  border-left: 3px solid rgba(30, 144, 255, 0.6) !important;
+  border-radius: 2px;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Dark theme support */
+.monaco-editor.vs-dark .active-sql-statement {
+  background-color: rgba(30, 144, 255, 0.1) !important;
+  border-left: 3px solid rgba(30, 144, 255, 0.8) !important;
+}
+
+/* Error statement highlighting */
+.error-sql-statement {
+  background-color: rgba(255, 99, 71, 0.1) !important;
+  border-left: 3px solid rgba(255, 99, 71, 0.6) !important;
+  border-radius: 2px;
+}
+
+.monaco-editor.vs-dark .error-sql-statement {
+  background-color: rgba(220, 20, 60, 0.15) !important;
+  border-left: 3px solid rgba(220, 20, 60, 0.8) !important;
+}
+
+/* SQL execution glyph button (▶️ icon in gutter) */
+.sql-execution-glyph {
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="%231890ff"><path d="M3 2 L13 8 L3 14 Z"/></svg>') no-repeat center center !important;
+  background-size: 12px 12px !important;
+  cursor: pointer !important;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.sql-execution-glyph:hover {
+  opacity: 1 !important;
+}
+
+/* Performance optimization: GPU acceleration */
+.active-sql-statement,
+.error-sql-statement {
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
