@@ -1,0 +1,265 @@
+openapi: 3.0.3
+info:
+  title: TableChat - Single SQL Statement Execution API
+  description: |
+    API extensions for executing single SQL statements with configurable timeout.
+
+    This specification documents the modifications to existing endpoints to support
+    the Single SQL Statement Execution feature (021-single-sql-execution).
+  version: 1.0.0
+  contact:
+    name: TableChat Development Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: http://localhost:8000/api
+    description: Local development server with API prefix
+
+tags:
+  - name: Query Execution
+    description: SQL query execution endpoints
+
+paths:
+  /query/execute:
+    post:
+      tags:
+        - Query Execution
+      summary: Execute a single SQL SELECT statement
+      description: |
+        Executes a single SQL SELECT statement with optional timeout configuration.
+
+        **Enhancements in 021-single-sql-execution:**
+        - Added `timeoutSeconds` parameter (10-300 seconds, default: 30)
+        - Timeout enforcement with graceful cancellation
+        - Connection error handling with retry support
+
+        **Constraints:**
+        - Only SELECT statements are allowed (enforced by existing validation)
+        - Automatic LIMIT 1000 added if no LIMIT clause present
+        - Queries exceeding timeout are cancelled and return 408 status
+      operationId: executeQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+            examples:
+              basicQuery:
+                summary: Basic SELECT query with default timeout
+                value:
+                  sql: "SELECT * FROM users WHERE active = true"
+                  timeoutSeconds: 30
+              customTimeout:
+                summary: Query with custom timeout
+                value:
+                  sql: "SELECT * FROM large_table"
+                  timeoutSeconds: 60
+              withNaturalQuery:
+                summary: AI-generated query with natural language context
+                value:
+                  sql: "SELECT name, email FROM users WHERE created_at > '2024-01-01'"
+                  naturalQuery: "Show me all users created this year"
+                  timeoutSeconds: 30
+      responses:
+        '200':
+          description: Query executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+              examples:
+                success:
+                  summary: Successful query execution
+                  value:
+                    sql: "SELECT * FROM users WHERE active = true LIMIT 1000"
+                    result:
+                      columns: ["id", "name", "email", "active"]
+                      rows:
+                        - id: 1
+                          name: "John Doe"
+                          email: "john@example.com"
+                          active: true
+                        - id: 2
+                          name: "Jane Smith"
+                          email: "jane@example.com"
+                          active: true
+                      rowCount: 2
+                      truncated: false
+                    executionTimeMs: 125
+        '400':
+          description: Invalid SQL or validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidSql:
+                  summary: SQL syntax error
+                  value:
+                    error: "SQL syntax error: unexpected token 'FORM'"
+                    errorType: "sql_error"
+                    details:
+                      line: 1
+                      column: 15
+                invalidTimeout:
+                  summary: Invalid timeout value
+                  value:
+                    error: "timeoutSeconds must be between 10 and 300"
+                    errorType: "validation_error"
+                    details:
+                      field: "timeoutSeconds"
+                      value: 500
+        '408':
+          description: Query execution timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                timeout:
+                  summary: Query exceeded timeout limit
+                  value:
+                    error: "Query execution exceeded timeout of 30 seconds"
+                    errorType: "timeout_error"
+                    details:
+                      timeoutSeconds: 30
+                      elapsedSeconds: 30.5
+        '500':
+          description: Database connection error or internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                connectionError:
+                  summary: Database connection failed
+                  value:
+                    error: "Failed to connect to database: Connection refused"
+                    errorType: "connection_error"
+                    details:
+                      host: "localhost"
+                      port: 5432
+
+components:
+  schemas:
+    QueryRequest:
+      type: object
+      required:
+        - sql
+      properties:
+        sql:
+          type: string
+          description: SQL SELECT statement to execute
+          minLength: 1
+          example: "SELECT * FROM users WHERE active = true"
+        naturalQuery:
+          type: string
+          nullable: true
+          description: Natural language description (if SQL was AI-generated)
+          example: "Show me all active users"
+        timeoutSeconds:
+          type: integer
+          minimum: 10
+          maximum: 300
+          default: 30
+          description: |
+            Query execution timeout in seconds.
+            - Minimum: 10 seconds
+            - Maximum: 300 seconds (5 minutes)
+            - Default: 30 seconds
+          example: 30
+
+    QueryResult:
+      type: object
+      required:
+        - columns
+        - rows
+        - rowCount
+        - truncated
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+          description: Column names from the query result
+          example: ["id", "name", "email"]
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Data rows (array of objects with column names as keys)
+          example:
+            - id: 1
+              name: "John Doe"
+              email: "john@example.com"
+            - id: 2
+              name: "Jane Smith"
+              email: "jane@example.com"
+        rowCount:
+          type: integer
+          minimum: 0
+          description: Number of rows returned
+          example: 2
+        truncated:
+          type: boolean
+          description: True if LIMIT was automatically added to the query
+          example: false
+
+    QueryResponse:
+      type: object
+      required:
+        - sql
+        - result
+        - executionTimeMs
+      properties:
+        sql:
+          type: string
+          description: Executed SQL (may include auto-added LIMIT clause)
+          example: "SELECT * FROM users WHERE active = true LIMIT 1000"
+        result:
+          $ref: '#/components/schemas/QueryResult'
+        executionTimeMs:
+          type: integer
+          minimum: 0
+          description: Query execution time in milliseconds
+          example: 125
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - errorType
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+          example: "SQL syntax error: unexpected token"
+        errorType:
+          type: string
+          enum:
+            - sql_error
+            - connection_error
+            - timeout_error
+            - validation_error
+          description: |
+            Error category:
+            - `sql_error`: Invalid SQL syntax
+            - `connection_error`: Database connection failed
+            - `timeout_error`: Query exceeded timeout limit
+            - `validation_error`: Request validation failed
+          example: "sql_error"
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Additional error context (structure varies by error type)
+          example:
+            line: 1
+            column: 15
+
+  securitySchemes: {}
+
+security: []
