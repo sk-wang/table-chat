@@ -93,13 +93,11 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
 
   // Update highlight when current statement changes (real-time highlighting)
   useEffect(() => {
-    requestAnimationFrame(() => {
-      if (currentStatement) {
-        updateHighlight(currentStatement);
-      } else {
-        clearHighlight();
-      }
-    });
+    if (currentStatement) {
+      updateHighlight(currentStatement);
+    } else {
+      clearHighlight();
+    }
   }, [currentStatement, updateHighlight, clearHighlight]);
 
   const handleEditorDidMount: OnMount = (editorInstance, monacoInstance) => {
@@ -122,9 +120,12 @@ export const SqlEditor: React.FC<SqlEditorProps> = ({
       }, 50); // 50ms debounce for performance
     });
 
-    // Set initial cursor position
-    const initialPosition = getCursorPosition(editorInstance);
-    setCursorPosition(initialPosition);
+    // Set initial cursor position after a short delay to avoid flashing
+    // Wait for editor to fully initialize
+    setTimeout(() => {
+      const initialPosition = getCursorPosition(editorInstance);
+      setCursorPosition(initialPosition);
+    }, 100);
 
     // Add F8 keyboard shortcut for single statement execution
     editorInstance.addCommand(monacoInstance.KeyCode.F8, () => {

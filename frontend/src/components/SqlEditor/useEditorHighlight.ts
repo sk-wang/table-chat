@@ -40,7 +40,7 @@ export function useEditorHighlight(
   editorInstance: editor.IStandaloneCodeEditor | null
 ): UseEditorHighlightResult {
   // Track current decoration IDs for cleanup
-  const [decorationIds, setDecorationIds] = useState<string[]>([]);
+  const decorationIdsRef = useRef<string[]>([]);
 
   // Track current highlight configuration
   const [currentHighlight, setCurrentHighlight] = useState<StatementHighlight | null>(null);
@@ -82,9 +82,6 @@ export function useEditorHighlight(
             range,
             options: {
               className: HIGHLIGHT_CLASSES.ACTIVE_STATEMENT,
-              hoverMessage: {
-                value: 'Press F8 or Cmd/Ctrl+Enter to execute this statement',
-              },
               // Use inline styles for better cross-theme compatibility
               inlineClassName: 'active-sql-statement-inline',
             },
@@ -92,11 +89,11 @@ export function useEditorHighlight(
 
           // Apply decoration using deltaDecorations (replaces old decorations)
           const newDecorationIds = editorRef.current.deltaDecorations(
-            decorationIds,
+            decorationIdsRef.current,
             [decoration]
           );
 
-          setDecorationIds(newDecorationIds);
+          decorationIdsRef.current = newDecorationIds;
 
           // Update current highlight state
           setCurrentHighlight({
@@ -114,7 +111,7 @@ export function useEditorHighlight(
         }
       });
     },
-    [decorationIds]
+    [] // No dependencies - use refs for stable callback
   );
 
   /**
@@ -125,27 +122,27 @@ export function useEditorHighlight(
 
     try {
       // Remove all decorations
-      editorRef.current.deltaDecorations(decorationIds, []);
-      setDecorationIds([]);
+      editorRef.current.deltaDecorations(decorationIdsRef.current, []);
+      decorationIdsRef.current = [];
       setCurrentHighlight(null);
     } catch (error) {
       console.error('Failed to clear highlight:', error);
     }
-  }, [decorationIds]);
+  }, []); // No dependencies - use refs for stable callback
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (editorRef.current && decorationIds.length > 0) {
+      if (editorRef.current && decorationIdsRef.current.length > 0) {
         try {
-          editorRef.current.deltaDecorations(decorationIds, []);
+          editorRef.current.deltaDecorations(decorationIdsRef.current, []);
         } catch (error) {
           // Editor might be disposed, ignore error
           console.warn('Could not clean up decorations on unmount:', error);
         }
       }
     };
-  }, [decorationIds]);
+  }, []); // Only run on unmount
 
   return {
     highlight: currentHighlight,
@@ -165,7 +162,7 @@ export function useEditorHighlight(
 export function useEditorErrorHighlight(
   editorInstance: editor.IStandaloneCodeEditor | null
 ) {
-  const [decorationIds, setDecorationIds] = useState<string[]>([]);
+  const decorationIdsRef = useRef<string[]>([]);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(editorInstance);
 
   useEffect(() => {
@@ -196,40 +193,40 @@ export function useEditorErrorHighlight(
         };
 
         const newDecorationIds = editorRef.current.deltaDecorations(
-          decorationIds,
+          decorationIdsRef.current,
           [decoration]
         );
 
-        setDecorationIds(newDecorationIds);
+        decorationIdsRef.current = newDecorationIds;
       } catch (error) {
         console.error('Failed to highlight error:', error);
       }
     },
-    [decorationIds]
+    [] // No dependencies - use refs for stable callback
   );
 
   const clearErrorHighlight = useCallback(() => {
     if (!editorRef.current) return;
 
     try {
-      editorRef.current.deltaDecorations(decorationIds, []);
-      setDecorationIds([]);
+      editorRef.current.deltaDecorations(decorationIdsRef.current, []);
+      decorationIdsRef.current = [];
     } catch (error) {
       console.error('Failed to clear error highlight:', error);
     }
-  }, [decorationIds]);
+  }, []); // No dependencies - use refs for stable callback
 
   useEffect(() => {
     return () => {
-      if (editorRef.current && decorationIds.length > 0) {
+      if (editorRef.current && decorationIdsRef.current.length > 0) {
         try {
-          editorRef.current.deltaDecorations(decorationIds, []);
+          editorRef.current.deltaDecorations(decorationIdsRef.current, []);
         } catch (error) {
           console.warn('Could not clean up error decorations on unmount:', error);
         }
       }
     };
-  }, [decorationIds]);
+  }, []); // Only run on unmount
 
   return {
     highlightError,

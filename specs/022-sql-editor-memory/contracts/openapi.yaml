@@ -1,0 +1,280 @@
+openapi: 3.0.3
+info:
+  title: SQL编辑器记忆API
+  description: 管理SQL编辑器历史内容的API接口
+  version: 1.0.0
+  contact:
+    name: TableChat Team
+
+servers:
+  - url: http://localhost:8000
+    description: 本地开发环境
+  - url: http://localhost:8000/api
+    description: API基础路径
+
+paths:
+  /editor-memory:
+    post:
+      summary: 保存编辑器内容
+      description: 创建一条新的SQL编辑器历史记录
+      operationId: createEditorMemory
+      tags:
+        - Editor Memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditorMemoryCreate'
+            examples:
+              normal:
+                summary: 正常保存
+                value:
+                  connectionId: "conn_postgres_prod"
+                  content: "SELECT * FROM users WHERE active = true;"
+              empty:
+                summary: 保存空内容
+                value:
+                  connectionId: "conn_postgres_prod"
+                  content: ""
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorMemory'
+              example:
+                id: 42
+                connectionId: "conn_postgres_prod"
+                content: "SELECT * FROM users WHERE active = true;"
+                createdAt: "2026-01-10T15:30:00Z"
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Invalid request"
+                detail: "connectionId is required"
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /editor-memory/{connectionId}:
+    get:
+      summary: 获取连接的历史记录
+      description: 获取指定数据库连接的所有编辑器历史记录，按时间倒序排列
+      operationId: getEditorMemoryByConnection
+      tags:
+        - Editor Memory
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          description: 数据库连接ID
+          schema:
+            type: string
+          example: "conn_postgres_prod"
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditorMemoryList'
+              example:
+                items:
+                  - id: 42
+                    connectionId: "conn_postgres_prod"
+                    content: "SELECT * FROM users WHERE active = true;"
+                    createdAt: "2026-01-10T15:30:00Z"
+                  - id: 41
+                    connectionId: "conn_postgres_prod"
+                    content: "SELECT * FROM users LIMIT 10;"
+                    createdAt: "2026-01-10T15:00:00Z"
+                total: 2
+        '404':
+          description: 连接不存在或无历史记���
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /editor-memory/{id}:
+    delete:
+      summary: 删除单条历史记录
+      description: 根据记录ID删除一条编辑器历史记录
+      operationId: deleteEditorMemory
+      tags:
+        - Editor Memory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 记录ID
+          schema:
+            type: integer
+          example: 42
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+              example:
+                success: true
+                message: "记录已删除"
+        '404':
+          description: 记录不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /editor-memory/connection/{connectionId}:
+    delete:
+      summary: 清空连接的所有历史记录
+      description: 删除指定数据库连���的所有编辑器历史记录
+      operationId: deleteAllEditorMemoryByConnection
+      tags:
+        - Editor Memory
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          description: 数据库连接ID
+          schema:
+            type: string
+          example: "conn_postgres_prod"
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  deletedCount:
+                    type: integer
+                    description: 删除的记录数
+              example:
+                success: true
+                message: "已清空连接的所有历史记录"
+                deletedCount: 15
+        '404':
+          description: 连接不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    EditorMemory:
+      type: object
+      required:
+        - id
+        - connectionId
+        - content
+        - createdAt
+      properties:
+        id:
+          type: integer
+          description: 记录ID
+          example: 42
+        connectionId:
+          type: string
+          description: 数据库连接ID
+          example: "conn_postgres_prod"
+        content:
+          type: string
+          description: 编辑器内容（可为空字符串）
+          example: "SELECT * FROM users WHERE active = true;"
+        createdAt:
+          type: string
+          format: date-time
+          description: 创建时间（ISO 8601格式）
+          example: "2026-01-10T15:30:00Z"
+
+    EditorMemoryCreate:
+      type: object
+      required:
+        - connectionId
+        - content
+      properties:
+        connectionId:
+          type: string
+          description: 数据库连接ID
+          minLength: 1
+          example: "conn_postgres_prod"
+        content:
+          type: string
+          description: 编辑器内容（可为空字符串）
+          example: "SELECT * FROM users;"
+
+    EditorMemoryList:
+      type: object
+      required:
+        - items
+        - total
+      properties:
+        items:
+          type: array
+          description: 历史记录列表
+          items:
+            $ref: '#/components/schemas/EditorMemory'
+        total:
+          type: integer
+          description: 总记录数
+          example: 2
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: 错误消息
+          example: "Invalid request"
+        detail:
+          type: string
+          description: 详细错误信息
+          example: "connectionId is required"
+
+tags:
+  - name: Editor Memory
+    description: SQL编辑器记忆管理

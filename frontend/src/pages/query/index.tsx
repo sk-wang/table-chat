@@ -11,6 +11,7 @@ import { ResizableSplitPane } from '../../components/layout/ResizableSplitPane';
 import { QueryHistoryTab } from '../../components/history';
 import { ExportButton } from '../../components/export';
 import { useDatabase } from '../../contexts/DatabaseContext';
+import { useEditorAutoSave } from '../../hooks/useEditorAutoSave';
 import { apiClient } from '../../services/api';
 import {
   getTableListCache,
@@ -75,6 +76,9 @@ export const QueryPage: React.FC = () => {
   // Counter to trigger history refresh after query execution
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
+  // Editor real-time save - saves immediately when content changes
+  useEditorAutoSave(selectedDatabase, sqlQuery);
+
   // Load table list when database changes (without column details)
   //优先使用缓存，API 作为回退 (T011, T012)
   useEffect(() => {
@@ -116,6 +120,32 @@ export const QueryPage: React.FC = () => {
     };
 
     loadTableList();
+  }, [selectedDatabase]);
+
+  // Load latest editor memory when database changes (T023)
+  useEffect(() => {
+    if (!selectedDatabase) {
+      return;
+    }
+
+    const loadLatestEditorMemory = async () => {
+      try {
+        const latest = await apiClient.getLatestEditorMemory(selectedDatabase);
+        if (latest && latest.content !== undefined) {
+          // Only restore if there's actual content
+          setSqlQuery(latest.content);
+          console.log('[EditorMemory] Loaded latest content for', selectedDatabase);
+        } else {
+          // Clear editor when no history exists for this database
+          setSqlQuery('');
+          console.log('[EditorMemory] No history found, clearing editor for', selectedDatabase);
+        }
+      } catch (error) {
+        console.error('[EditorMemory] Failed to load latest memory:', error);
+      }
+    };
+
+    loadLatestEditorMemory();
   }, [selectedDatabase]);
 
   // Load table details on demand - 优先使用缓存 (T015, T016)

@@ -327,3 +327,103 @@ Content-Type: application/json
 GET {{baseUrl}}/dbs/nonexistent/metadata
 Content-Type: application/json
 
+################################################################################
+# SQL 编辑器记忆 API (Feature 022)
+################################################################################
+
+### 41. 创建编辑器记忆 - 保存 SQL 内容
+POST {{baseUrl}}/editor-memory
+Content-Type: application/json
+
+{
+  "connectionId": "test_conn_1",
+  "content": "SELECT * FROM users WHERE id = 1;"
+}
+
+### 42. 创建编辑器记忆 - 保存空内容
+POST {{baseUrl}}/editor-memory
+Content-Type: application/json
+
+{
+  "connectionId": "test_conn_2",
+  "content": ""
+}
+
+### 43. 创建编辑器记忆 - 保存多行 SQL
+POST {{baseUrl}}/editor-memory
+Content-Type: application/json
+
+{
+  "connectionId": "test_conn_1",
+  "content": "SELECT u.id, u.name, o.order_date\nFROM users u\nJOIN orders o ON u.id = o.user_id\nWHERE o.status = 'completed';"
+}
+
+### 44. 获取指定连接的所有编辑器记忆
+GET {{baseUrl}}/editor-memory/test_conn_1
+Content-Type: application/json
+
+### 45. 获取不存在连接的编辑器记忆（应返回空列表）
+GET {{baseUrl}}/editor-memory/nonexistent_conn
+Content-Type: application/json
+
+### 46. 获取指定连接的最新编辑器记忆
+GET {{baseUrl}}/editor-memory/latest/test_conn_1
+Content-Type: application/json
+
+### 47. 获取不存在连接的最新记忆（应返回 null）
+GET {{baseUrl}}/editor-memory/latest/nonexistent_conn
+Content-Type: application/json
+
+### 48. 删除单条编辑器记忆（需要先创建并获取 ID）
+# 先创建一条记录用于测试删除
+POST {{baseUrl}}/editor-memory
+Content-Type: application/json
+
+{
+  "connectionId": "test_delete",
+  "content": "SELECT 1 as to_be_deleted;"
+}
+
+### 49. 删除单条编辑器记忆 - 使用实际 ID
+# 替换 {id} 为实际的记录 ID
+DELETE {{baseUrl}}/editor-memory/1
+Content-Type: application/json
+
+### 50. 删除不存在的记忆记录（应返回 404）
+DELETE {{baseUrl}}/editor-memory/99999
+Content-Type: application/json
+
+### 51. 清空指定连接的所有编辑器记忆
+DELETE {{baseUrl}}/editor-memory/connection/test_conn_1
+Content-Type: application/json
+
+### 52. 清空不存在连接的编辑器记忆（应返回删除数为 0）
+DELETE {{baseUrl}}/editor-memory/connection/empty_connection
+Content-Type: application/json
+
+### 53. 测试完整工作流 - 创建、查询、删除
+# Step 1: 创建记录
+POST {{baseUrl}}/editor-memory
+Content-Type: application/json
+
+{
+  "connectionId": "workflow_test",
+  "content": "SELECT * FROM test_workflow;"
+}
+
+### Step 2: 查询该连接的所有记录
+GET {{baseUrl}}/editor-memory/workflow_test
+Content-Type: application/json
+
+### Step 3: 获取最新记录
+GET {{baseUrl}}/editor-memory/latest/workflow_test
+Content-Type: application/json
+
+### Step 4: 清空该连接的所有记录
+DELETE {{baseUrl}}/editor-memory/connection/workflow_test
+Content-Type: application/json
+
+### Step 5: 验证清空后为空
+GET {{baseUrl}}/editor-memory/workflow_test
+Content-Type: application/json
+

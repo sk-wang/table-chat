@@ -26,6 +26,8 @@ Auto-generated from all feature plans. Last updated: 2026-01-09
 - SQLite (existing) (020-i18n-readme)
 - TypeScript 5.9+ (Frontend), Python 3.13+ (Backend) + Monaco Editor (decorations API), React 19 hooks (useMemo, useCallback), localStorage API, asyncio.wait_for (021-single-sql-execution)
 - SQLite (existing metadata store, no schema changes needed for this feature) (021-single-sql-execution)
+- Python 3.13+ (后端), TypeScript 5.9+ (前端) + FastAPI, Pydantic, aiosqlite (后端); React 19, Ant Design, Monaco Editor (前端) (022-sql-editor-memory)
+- SQLite (用于存储编辑器历史记录) (022-sql-editor-memory)
 
 - Python 3.13+ (uv) / TypeScript 5.x (001-db-query-tool)
 
@@ -45,9 +47,9 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.13+ (uv) / TypeScript 5.x: Follow standard conventions
 
 ## Recent Changes
+- 022-sql-editor-memory: Added Python 3.13+ (后端), TypeScript 5.9+ (前端) + FastAPI, Pydantic, aiosqlite (后端); React 19, Ant Design, Monaco Editor (前端)
 - 021-single-sql-execution: Added SQLite (existing metadata store, no schema changes needed for this feature)
 - 020-i18n-readme: Added Python 3.13+ (backend), TypeScript (frontend) + FastAPI (backend), React + TypeScript (frontend), Tailwind CSS, Ant Design
-- 019-sql-display: Added TypeScript 5.x (前端), React 19 + React, marked (Markdown 解析), highlight.js (语法高亮), Ant Design
 
 
 <!-- MANUAL ADDITIONS START -->

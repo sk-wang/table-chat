@@ -26,8 +26,86 @@ import type {
   ErrorEventData,
   DoneEventData,
 } from '../types/agent';
+import type {
+  EditorMemory,
+  EditorMemoryCreate,
+  EditorMemoryList,
+} from '../types/editorMemory';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:7888';
+
+/**
+ * Clean SQL by compressing whitespace outside of string literals
+ * Preserves whitespace inside strings (single/double quotes)
+ */
+function cleanSQL(sql: string): string {
+  const parts: Array<{ content: string; isString: boolean }> = [];
+  let current = '';
+  let inString = false;
+  let stringChar = '';
+  let escaped = false;
+
+  for (let i = 0; i < sql.length; i++) {
+    const char = sql[i];
+
+    // Handle escape sequences
+    if (escaped) {
+      current += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      current += char;
+      escaped = true;
+      continue;
+    }
+
+    // Handle string delimiters
+    if ((char === "'" || char === '"' || char === '`') && !inString) {
+      // Start of string literal
+      if (current) {
+        parts.push({ content: current, isString: false });
+        current = '';
+      }
+      stringChar = char;
+      inString = true;
+      current += char;
+    } else if (char === stringChar && inString) {
+      // Check for doubled quotes (SQL escape: '' or "")
+      if (sql[i + 1] === stringChar) {
+        current += char + sql[i + 1];
+        i++; // Skip next char
+      } else {
+        // End of string literal
+        current += char;
+        parts.push({ content: current, isString: true });
+        current = '';
+        inString = false;
+        stringChar = '';
+      }
+    } else {
+      current += char;
+    }
+  }
+
+  // Handle remaining content
+  if (current) {
+    parts.push({ content: current, isString: inString });
+  }
+
+  // Compress whitespace only in non-string parts
+  return parts
+    .map(part => {
+      if (part.isString) {
+        return part.content; // Preserve strings exactly
+      } else {
+        return part.content.replace(/\s+/g, ' '); // Compress whitespace
+      }
+    })
+    .join('')
+    .trim();
+}
 
 class ApiClient {
   private client: AxiosInstance;
@@ -88,9 +166,12 @@ class ApiClient {
 
   async executeQuery(dbName: string, data: QueryRequest): Promise<QueryResponse> {
     try {
+      // Clean up SQL: compress whitespace outside of string literals
+      const cleanedSql = cleanSQL(data.sql);
+
       const response: AxiosResponse<QueryResponse> = await this.client.post(
         `/dbs/${dbName}/query`,
-        data
+        { ...data, sql: cleanedSql }
       );
       return response.data;
     } catch (error) {
@@ -344,6 +425,64 @@ class ApiClient {
   async cancelAgentQuery(dbName: string): Promise<{ cancelled: boolean }> {
     try {
       const response = await this.client.post(`/dbs/${dbName}/agent/cancel`);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  // === Editor Memory Operations ===
+
+  async saveEditorMemory(data: EditorMemoryCreate): Promise<EditorMemory> {
+    try {
+      const response: AxiosResponse<EditorMemory> = await this.client.post(
+        '/editor-memory',
+        data
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async getEditorMemories(connectionId: string): Promise<EditorMemoryList> {
+    try {
+      const response: AxiosResponse<EditorMemoryList> = await this.client.get(
+        `/editor-memory/${connectionId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async getLatestEditorMemory(connectionId: string): Promise<EditorMemory | null> {
+    try {
+      const response: AxiosResponse<EditorMemory | null> = await this.client.get(
+        `/editor-memory/latest/${connectionId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async deleteEditorMemory(recordId: number): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await this.client.delete(`/editor-memory/${recordId}`);
+      return response.data;
+    } catch (error) {
+      throw this.handleError(error as AxiosError<ErrorResponse>);
+    }
+  }
+
+  async deleteAllEditorMemories(connectionId: string): Promise<{
+    success: boolean;
+    message: string;
+    deletedCount: number;
+  }> {
+    try {
+      const response = await this.client.delete(`/editor-memory/connection/${connectionId}`);
       return response.data;
     } catch (error) {
       throw this.handleError(error as AxiosError<ErrorResponse>);

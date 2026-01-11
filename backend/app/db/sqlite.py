@@ -80,6 +80,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS query_history_fts USING fts5(
 );
 """
 
+# Editor memory table schema
+EDITOR_MEMORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS editor_memory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    connection_id TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_connection_id ON editor_memory(connection_id);
+CREATE INDEX IF NOT EXISTS idx_created_at ON editor_memory(created_at);
+"""
+
 
 class SQLiteManager:
     """Async SQLite database manager."""
@@ -106,6 +119,7 @@ class SQLiteManager:
             await self._migrate_add_ssl_disabled(conn)
             await self._migrate_add_ssh_config(conn)
             await self._migrate_add_query_history(conn)
+            await self._migrate_add_editor_memory(conn)
 
     async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
         """Add db_type column if it doesn't exist (migration for existing DBs)."""
@@ -180,6 +194,20 @@ class SQLiteManager:
         if not await cursor.fetchone():
             try:
                 await conn.executescript(QUERY_HISTORY_FTS_SCHEMA)
+                await conn.commit()
+            except Exception:
+                # Table already exists or other error, ignore
+                pass
+
+    async def _migrate_add_editor_memory(self, conn: aiosqlite.Connection) -> None:
+        """Create editor_memory table and indexes if they don't exist."""
+        # Check if editor_memory table exists
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='editor_memory'"
+        )
+        if not await cursor.fetchone():
+            try:
+                await conn.executescript(EDITOR_MEMORY_SCHEMA)
                 await conn.commit()
             except Exception:
                 # Table already exists or other error, ignore
