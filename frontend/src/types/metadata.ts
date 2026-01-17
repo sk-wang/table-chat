@@ -7,6 +7,7 @@ export interface ColumnInfo {
   isPrimaryKey: boolean;
   defaultValue?: string;
   comment?: string;
+  extra?: string;
 }
 
 export interface TableSummary {

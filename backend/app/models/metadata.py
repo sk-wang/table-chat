@@ -14,6 +14,7 @@ class ColumnInfo(CamelModel):
     is_primary_key: bool = Field(False, description="Whether column is part of primary key")
     default_value: str | None = Field(None, description="Default value if any")
     comment: str | None = Field(None, description="Column comment/description")
+    extra: str | None = Field(None, description="Special attributes (e.g., auto_increment, identity)")
 
 
 class TableSummary(CamelModel):

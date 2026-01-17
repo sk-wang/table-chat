@@ -199,10 +199,11 @@ class MySQLConnector(DatabaseConnector):
                         TABLE_NAME,
                         COLUMN_NAME,
                         DATA_TYPE,
-                                IS_NULLABLE,
+                        IS_NULLABLE,
                         COLUMN_DEFAULT,
                         COLUMN_KEY,
-                        COLUMN_COMMENT
+                        COLUMN_COMMENT,
+                        EXTRA
                     FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_SCHEMA NOT IN (
                         'information_schema', 'mysql', 'performance_schema', 'sys'
@@ -229,6 +230,7 @@ class MySQLConnector(DatabaseConnector):
                             is_primary_key=is_pk,
                             default_value=row[5],
                             comment=row[7],
+                            extra=row[8] if row[8] else None,
                         )
                     )
 

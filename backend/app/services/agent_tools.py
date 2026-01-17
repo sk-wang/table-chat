@@ -179,12 +179,16 @@ async def execute_get_table_schema(db_name: str, table_name: str) -> str:
                 is_nullable = col.get("isNullable", col.get("is_nullable", True))
                 is_pk = col.get("isPrimaryKey", col.get("is_primary_key", False))
                 col_comment = col.get("comment", "")
+                col_default = col.get("defaultValue", col.get("default_value", ""))
+                col_extra = col.get("extra", "")
 
                 nullable_str = "" if is_nullable else " NOT NULL"
                 pk_str = " [PK]" if is_pk else ""
+                default_str = f" (Default: {col_default})" if col_default else ""
+                extra_str = f" (Extra: {col_extra})" if col_extra else ""
                 comment_str = f" -- {col_comment}" if col_comment else ""
 
-                lines.append(f"  - {col_name}: {col_type}{nullable_str}{pk_str}{comment_str}")
+                lines.append(f"  - {col_name}: {col_type}{nullable_str}{pk_str}{default_str}{extra_str}{comment_str}")
 
             lines.append("")
 
