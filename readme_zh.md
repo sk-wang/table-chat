@@ -103,7 +103,7 @@ docker compose up --build  # 重新构建
 ### Agent 模式 — 智能探索数据库
 
 <p align="center">
-  <img src="docs/img-2.png" alt="Agent Result" width="800"/>
+  <img src="docs/img.png" alt="Agent Result" width="800"/>
 </p>
 
 > 💡 AI 自动探索表结构 → 执行验证查询 → 生成精准 SQL → Markdown 格式化输出

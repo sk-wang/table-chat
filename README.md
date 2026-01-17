@@ -103,7 +103,7 @@ docker compose up --build  # Rebuild
 ### Agent Mode — Intelligent Database Exploration
 
 <p align="center">
-  <img src="docs/img-2.png" alt="Agent Result" width="800"/>
+  <img src="docs/img.png" alt="Agent Result" width="800"/>
 </p>
 
 > 💡 AI automatically explores table structures → Executes validation queries → Generates precise SQL → Outputs in Markdown format
