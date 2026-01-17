@@ -272,49 +272,87 @@ export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentC
 
   // Track if we're currently processing to prevent history reload during active session
   const isProcessingRef = useRef(false);
+  const lastLoadedConversationRef = useRef<{ id: string; count: number } | null>(null);
 
   // Load messages from activeConversation when it changes (but not during active processing)
   useEffect(() => {
-    if (isProcessingRef.current || stateRef.current.status !== 'idle') {
+    if (isProcessingRef.current || state.status !== 'idle') {
       return;
     }
-    
+
     if (activeConversation?.messages) {
+      if (
+        lastLoadedConversationRef.current?.id === activeConversation.id &&
+        lastLoadedConversationRef.current?.count === activeConversation.messages.length
+      ) {
+        return;
+      }
+
       const agentMessages: AgentMessage[] = activeConversation.messages.map((msg) => {
-        if (msg.toolCalls && msg.toolCalls.length > 0) {
-          // Create tool messages for each tool call
-          return msg.toolCalls.map((tc) => ({
-            id: `tool-${tc.id}`,
-            role: 'tool' as const,
-            content: '',
-            timestamp: new Date(msg.createdAt).getTime(),
-            toolCall: {
-              id: tc.id,
-              name: tc.tool,
-              input: tc.input,
-              output: tc.output || undefined,
-              status: tc.status as 'running' | 'completed' | 'error',
-              durationMs: tc.durationMs || undefined,
-            },
-          }));
-        }
-        return [{
+        const baseMessage = {
           id: String(msg.id),
           role: msg.role as 'user' | 'assistant',
           content: msg.content,
           timestamp: new Date(msg.createdAt).getTime(),
-        }];
+        };
+
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          const messages: AgentMessage[] = [];
+          
+          msg.toolCalls.forEach((tc) => {
+            // 1. If there's preceding text attached to this tool call, add it as a separate assistant message
+            if (tc.precedingText) {
+              messages.push({
+                id: `pre-tool-${tc.id}`,
+                role: 'assistant',
+                content: tc.precedingText,
+                timestamp: new Date(msg.createdAt).getTime(),
+              });
+            }
+
+            // 2. Add the tool call message itself
+            messages.push({
+              id: `tool-${tc.id}`,
+              role: 'tool' as const,
+              content: '',
+              timestamp: new Date(msg.createdAt).getTime(),
+              toolCall: {
+                id: tc.id,
+                name: tc.tool,
+                input: tc.input,
+                output: tc.output || undefined,
+                status: tc.status as 'running' | 'completed' | 'error',
+                durationMs: tc.durationMs || undefined,
+                // precedingText is consumed above, no need to pass it to UI component if it doesn't use it
+              },
+            });
+          });
+
+          // 3. Add the final assistant response (if any)
+          if (msg.content) {
+            messages.push(baseMessage);
+          }
+
+          return messages;
+        }
+
+        return [baseMessage];
       }).flat();
-      
+
       dispatch({ type: 'LOAD_HISTORY', messages: agentMessages });
+      lastLoadedConversationRef.current = {
+        id: activeConversation.id,
+        count: activeConversation.messages.length,
+      };
       isFirstMessageRef.current = activeConversation.messages.length === 0;
       conversationIdRef.current = activeConversation.id;
     } else if (!activeConversationId) {
       dispatch({ type: 'LOAD_HISTORY', messages: [] });
+      lastLoadedConversationRef.current = null;
       isFirstMessageRef.current = true;
       conversationIdRef.current = null;
     }
-  }, [activeConversation, activeConversationId]);
+  }, [activeConversation, activeConversationId, state.status]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -436,6 +474,8 @@ export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentC
       let accumulatedToolCalls: ToolCallData[] = [];
       // Track if we received text_delta events (streaming) to avoid duplicate message accumulation
       let receivedTextDelta = false;
+      // Track the text that came before the current tool call
+      let currentPrecedingText = '';
 
       const handlers = {
         onThinking: (data: ThinkingEventData) => {
@@ -447,6 +487,14 @@ export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentC
           receivedTextDelta = true;
         },
         onToolCall: (data: ToolCallEventData) => {
+          // If starting a new tool call, capture the accumulated text as preceding text for this tool
+          if (data.status === 'running') {
+            if (accumulatedResponse.trim()) {
+              currentPrecedingText = accumulatedResponse;
+              accumulatedResponse = ''; // Reset for next segment (e.g. final response)
+            }
+          }
+          
           dispatch({ type: 'UPDATE_TOOL_CALL', data });
           if (data.status === 'completed' || data.status === 'error') {
             const toolCall: ToolCallData = {
@@ -456,7 +504,11 @@ export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentC
               status: data.status,
               output: data.output || null,
               durationMs: data.durationMs || null,
+              precedingText: currentPrecedingText || undefined,
             };
+            // Reset preceding text after attaching it to a tool call
+            currentPrecedingText = '';
+            
             const existingIdx = accumulatedToolCalls.findIndex(tc => tc.id === data.id);
             if (existingIdx >= 0) {
               accumulatedToolCalls[existingIdx] = toolCall;
@@ -507,13 +559,16 @@ export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentC
             timeoutRef.current = null;
           }
 
-          if (conversationIdRef.current && accumulatedResponse) {
-            await saveMessageToBackend(
-              conversationIdRef.current,
-              'assistant',
-              accumulatedResponse,
-              accumulatedToolCalls.length > 0 ? accumulatedToolCalls : null
-            );
+          if (conversationIdRef.current) {
+            // Save final message with tool calls (containing precedingText) and remaining response
+            if (accumulatedResponse.trim() || accumulatedToolCalls.length > 0) {
+              await saveMessageToBackend(
+                conversationIdRef.current,
+                'assistant',
+                accumulatedResponse, // This is the final text AFTER the last tool call
+                accumulatedToolCalls.length > 0 ? accumulatedToolCalls : null
+              );
+            }
 
             if (shouldGenerateTitle) {
               generateTitle(conversationIdRef.current, trimmedPrompt).catch(err => {

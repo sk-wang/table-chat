@@ -16,7 +16,7 @@ type ConversationAction =
   | { type: 'SET_CONVERSATIONS'; payload: Conversation[] }
   | { type: 'SET_ACTIVE_CONVERSATION'; payload: ConversationWithMessages | null }
   | { type: 'ADD_CONVERSATION'; payload: Conversation }
-  | { type: 'UPDATE_CONVERSATION'; payload: Conversation }
+  | { type: 'UPDATE_CONVERSATION'; payload: Partial<Conversation> & { id: string } }
   | { type: 'DELETE_CONVERSATION'; payload: string }
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'SET_ACTIVE_ID'; payload: string | null };
@@ -52,7 +52,7 @@ function conversationReducer(state: ConversationState, action: ConversationActio
       return {
         ...state,
         conversations: state.conversations.map((c) =>
-          c.id === action.payload.id ? action.payload : c
+          c.id === action.payload.id ? { ...c, ...action.payload } : c
         ),
         activeConversation:
           state.activeConversation?.id === action.payload.id
@@ -152,9 +152,8 @@ export function ConversationProvider({ children }: { children: React.ReactNode }
 
   const generateTitle = useCallback(async (conversationId: string, firstMessage: string) => {
     try {
-      await conversationApi.generateTitle(conversationId, { firstMessage });
-      const updated = await conversationApi.getConversation(conversationId);
-      dispatch({ type: 'UPDATE_CONVERSATION', payload: updated });
+      const result = await conversationApi.generateTitle(conversationId, { firstMessage });
+      dispatch({ type: 'UPDATE_CONVERSATION', payload: { id: conversationId, title: result.title } });
     } catch (err) {
       console.error('Failed to generate title:', err);
     }

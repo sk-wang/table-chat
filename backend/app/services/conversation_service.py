@@ -79,7 +79,7 @@ class ConversationService:
                 SELECT id, conversation_id, role, content, tool_calls_json, created_at
                 FROM agent_messages
                 WHERE conversation_id = ?
-                ORDER BY created_at ASC
+                ORDER BY id ASC
                 LIMIT ?
                 """,
                 (conversation_id, message_limit),

@@ -22,6 +22,7 @@ export interface ToolCallData {
   status: 'running' | 'completed' | 'error';
   output: string | null;
   durationMs: number | null;
+  precedingText?: string;
 }
 
 export interface ConversationWithMessages extends Conversation {

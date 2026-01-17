@@ -144,3 +144,6 @@ ai agent支持多个会话。且会话会存储到sqlite数据库中，交互类
 
 ## 加入类似阿里云dms的单条sql执行交互
 ![img.png](img.png)
+
+## 优化tableschema工具
+tableschema工具返回的字段信息和表信息更全一点，比如默认的字段类型，是否允许为空，是否有默认值，注释，特殊信息等。
