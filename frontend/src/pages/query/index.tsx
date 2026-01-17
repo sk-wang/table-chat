@@ -711,6 +711,7 @@ export const QueryPage: React.FC = () => {
       {/* Agent Sidebar - Right side */}
       <AgentSidebar
         dbName={selectedDatabase || ''}
+        connectionId={selectedDatabase || undefined}
         disabled={!selectedDatabase}
         onSQLGenerated={handleAgentSQLGenerated}
       />

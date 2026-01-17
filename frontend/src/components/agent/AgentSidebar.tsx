@@ -5,12 +5,17 @@ import {
   CloseOutlined,
   ExpandOutlined,
   CompressOutlined,
+  PlusOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import { AgentChat } from './AgentChat';
+import { ConversationDropdown } from './ConversationDropdown';
+import { useConversation } from '../../contexts/ConversationContext';
 import './styles.css';
 
 interface AgentSidebarProps {
   dbName: string;
+  connectionId?: string;
   disabled?: boolean;
   onSQLGenerated?: (sql: string) => void;
 }
@@ -35,6 +40,7 @@ const getInitialWidth = (): number => {
 
 export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   dbName,
+  connectionId,
   disabled = false,
   onSQLGenerated,
 }) => {
@@ -42,8 +48,10 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
   const [width, setWidth] = useState(getInitialWidth);
   const [isResizing, setIsResizing] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
+  const { createConversation } = useConversation();
 
   // Save width to localStorage
   useEffect(() => {
@@ -160,6 +168,22 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
               <span>AI Agent</span>
             </div>
             <div className="agent-sidebar-actions">
+              <Tooltip title="New Chat">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<PlusOutlined />}
+                  onClick={() => connectionId && createConversation(connectionId)}
+                />
+              </Tooltip>
+              <Tooltip title="Chat History">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<HistoryOutlined />}
+                  onClick={() => setShowHistory(true)}
+                />
+              </Tooltip>
               <Tooltip title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}>
                 <Button
                   type="text"
@@ -179,10 +203,18 @@ export const AgentSidebar: React.FC<AgentSidebarProps> = ({
             </div>
           </div>
 
-          {/* Agent Chat */}
-          <div className="agent-sidebar-body">
+          {connectionId && (
+            <ConversationDropdown
+              connectionId={connectionId}
+              visible={showHistory}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+
+          <div className="agent-sidebar-body" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             <AgentChat
               dbName={dbName}
+              connectionId={connectionId}
               disabled={disabled}
               onSQLGenerated={handleSQLGenerated}
             />

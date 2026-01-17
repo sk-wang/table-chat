@@ -5,6 +5,7 @@ import { ConfigProvider, App as AntdApp, theme } from 'antd';
 
 import { dataProvider } from './providers/data-provider';
 import { DatabaseProvider } from './contexts/DatabaseContext';
+import { ConversationProvider } from './contexts/ConversationContext';
 import { MainLayout } from './components/layout/MainLayout';
 import { QueryPage } from './pages/query';
 
@@ -37,7 +38,8 @@ function App() {
       <ConfigProvider theme={jetbrainsTheme}>
         <AntdApp>
           <DatabaseProvider>
-            <Refine
+            <ConversationProvider>
+              <Refine
             dataProvider={dataProvider}
             notificationProvider={useNotificationProvider}
             resources={[
@@ -62,6 +64,7 @@ function App() {
               </Route>
             </Routes>
             </Refine>
+            </ConversationProvider>
           </DatabaseProvider>
         </AntdApp>
       </ConfigProvider>

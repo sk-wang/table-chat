@@ -93,6 +93,34 @@ CREATE INDEX IF NOT EXISTS idx_connection_id ON editor_memory(connection_id);
 CREATE INDEX IF NOT EXISTS idx_created_at ON editor_memory(created_at);
 """
 
+# Agent conversations table schema
+AGENT_CONVERSATIONS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS agent_conversations (
+    id TEXT PRIMARY KEY,
+    connection_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (connection_id) REFERENCES databases(name) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_connection ON agent_conversations(connection_id);
+CREATE INDEX IF NOT EXISTS idx_conv_updated ON agent_conversations(updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS agent_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL,
+    tool_calls_json TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (conversation_id) REFERENCES agent_conversations(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_msg_conversation ON agent_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_msg_created ON agent_messages(created_at);
+"""
+
 
 class SQLiteManager:
     """Async SQLite database manager."""
@@ -120,6 +148,7 @@ class SQLiteManager:
             await self._migrate_add_ssh_config(conn)
             await self._migrate_add_query_history(conn)
             await self._migrate_add_editor_memory(conn)
+            await self._migrate_add_agent_conversations(conn)
 
     async def _migrate_add_db_type(self, conn: aiosqlite.Connection) -> None:
         """Add db_type column if it doesn't exist (migration for existing DBs)."""
@@ -211,6 +240,17 @@ class SQLiteManager:
                 await conn.commit()
             except Exception:
                 # Table already exists or other error, ignore
+                pass
+
+    async def _migrate_add_agent_conversations(self, conn: aiosqlite.Connection) -> None:
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_conversations'"
+        )
+        if not await cursor.fetchone():
+            try:
+                await conn.executescript(AGENT_CONVERSATIONS_SCHEMA)
+                await conn.commit()
+            except Exception:
                 pass
 
     # === Database CRUD Operations ===

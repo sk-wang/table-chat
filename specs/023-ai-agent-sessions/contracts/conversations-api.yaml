@@ -1,0 +1,338 @@
+openapi: 3.0.3
+info:
+  title: TableChat Agent Conversations API
+  description: API endpoints for managing AI Agent conversation sessions
+  version: 1.0.0
+
+paths:
+  /api/v1/dbs/{connectionId}/conversations:
+    get:
+      summary: List conversations for a database connection
+      description: Returns all conversations for the specified database connection, sorted by most recent activity
+      operationId: listConversations
+      tags:
+        - Conversations
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Database connection name
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+          description: Maximum number of conversations to return
+      responses:
+        '200':
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+                  total:
+                    type: integer
+        '404':
+          description: Database connection not found
+
+    post:
+      summary: Create a new conversation
+      description: Creates a new empty conversation for the specified database connection
+      operationId: createConversation
+      tags:
+        - Conversations
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  description: Optional initial title (defaults to "New Conversation")
+      responses:
+        '201':
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '404':
+          description: Database connection not found
+
+  /api/v1/conversations/{conversationId}:
+    get:
+      summary: Get conversation with messages
+      description: Returns a conversation with its full message history
+      operationId: getConversation
+      tags:
+        - Conversations
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: messageLimit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+          description: Maximum number of messages to return
+      responses:
+        '200':
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationWithMessages'
+        '404':
+          description: Conversation not found
+
+    patch:
+      summary: Update conversation (rename)
+      description: Updates conversation metadata (currently only title)
+      operationId: updateConversation
+      tags:
+        - Conversations
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+      responses:
+        '200':
+          description: Conversation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '404':
+          description: Conversation not found
+
+    delete:
+      summary: Delete conversation
+      description: Permanently deletes a conversation and all its messages
+      operationId: deleteConversation
+      tags:
+        - Conversations
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Conversation deleted
+        '404':
+          description: Conversation not found
+
+  /api/v1/conversations/{conversationId}/messages:
+    post:
+      summary: Add message to conversation
+      description: Adds a new message to the conversation (typically called after agent response)
+      operationId: addMessage
+      tags:
+        - Messages
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+      responses:
+        '201':
+          description: Message added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '404':
+          description: Conversation not found
+
+  /api/v1/conversations/{conversationId}/generate-title:
+    post:
+      summary: Generate title using LLM
+      description: Generates a concise title for the conversation based on the first message
+      operationId: generateTitle
+      tags:
+        - Conversations
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - firstMessage
+              properties:
+                firstMessage:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Title generated and saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  title:
+                    type: string
+        '404':
+          description: Conversation not found
+        '503':
+          description: LLM service unavailable
+
+components:
+  schemas:
+    Conversation:
+      type: object
+      required:
+        - id
+        - connectionId
+        - title
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        connectionId:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Message:
+      type: object
+      required:
+        - id
+        - conversationId
+        - role
+        - content
+        - createdAt
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        toolCalls:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ToolCall'
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageCreate:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+        toolCalls:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/ToolCall'
+
+    ToolCall:
+      type: object
+      required:
+        - id
+        - tool
+        - input
+        - status
+      properties:
+        id:
+          type: string
+        tool:
+          type: string
+        input:
+          type: object
+        status:
+          type: string
+          enum: [running, completed, error]
+        output:
+          type: string
+          nullable: true
+        durationMs:
+          type: integer
+          nullable: true
+
+    ConversationWithMessages:
+      allOf:
+        - $ref: '#/components/schemas/Conversation'
+        - type: object
+          properties:
+            messages:
+              type: array
+              items:
+                $ref: '#/components/schemas/Message'

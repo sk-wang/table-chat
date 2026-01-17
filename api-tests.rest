@@ -427,3 +427,124 @@ Content-Type: application/json
 GET {{baseUrl}}/editor-memory/workflow_test
 Content-Type: application/json
 
+################################################################################
+# AI Agent Conversations API (Feature 023)
+################################################################################
+
+### 54. 创建新对话
+POST {{baseUrl}}/dbs/testdb/conversations
+Content-Type: application/json
+
+{
+  "title": "Test Conversation"
+}
+
+### 55. 创建对话 - 使用默认标题
+POST {{baseUrl}}/dbs/testdb/conversations
+Content-Type: application/json
+
+{}
+
+### 56. 列出所有对话
+GET {{baseUrl}}/dbs/testdb/conversations
+Content-Type: application/json
+
+### 57. 列出对话 - 限制数量
+GET {{baseUrl}}/dbs/testdb/conversations?limit=10
+Content-Type: application/json
+
+### 58. 获取特定对话（替换 {conversationId} 为实际 ID）
+GET {{baseUrl}}/conversations/{conversationId}
+Content-Type: application/json
+
+### 59. 获取对话 - 带消息限制
+GET {{baseUrl}}/conversations/{conversationId}?messageLimit=50
+Content-Type: application/json
+
+### 60. 更新对话标题
+PATCH {{baseUrl}}/conversations/{conversationId}
+Content-Type: application/json
+
+{
+  "title": "Updated Title"
+}
+
+### 61. 添加用户消息到对话
+POST {{baseUrl}}/conversations/{conversationId}/messages
+Content-Type: application/json
+
+{
+  "role": "user",
+  "content": "Help me query all users from the database"
+}
+
+### 62. 添加助手消息到对话（带 tool calls）
+POST {{baseUrl}}/conversations/{conversationId}/messages
+Content-Type: application/json
+
+{
+  "role": "assistant",
+  "content": "I'll help you query the users. Let me first check the table structure.",
+  "toolCalls": [
+    {
+      "id": "tool-1",
+      "tool": "list_tables",
+      "input": {},
+      "status": "completed",
+      "output": "[\"users\", \"orders\", \"products\"]",
+      "durationMs": 150
+    }
+  ]
+}
+
+### 63. 生成对话标题
+POST {{baseUrl}}/conversations/{conversationId}/generate-title
+Content-Type: application/json
+
+{
+  "firstMessage": "Help me query all users from the database"
+}
+
+### 64. 删除对话
+DELETE {{baseUrl}}/conversations/{conversationId}
+Content-Type: application/json
+
+### 65. 获取不存在的对话（应返回 404）
+GET {{baseUrl}}/conversations/non-existent-id
+Content-Type: application/json
+
+### 66. 对话完整工作流测试
+# Step 1: 创建对话
+POST {{baseUrl}}/dbs/testdb/conversations
+Content-Type: application/json
+
+{
+  "title": "Workflow Test Conversation"
+}
+
+### Step 2: 添加用户消息（替换 {conversationId}）
+POST {{baseUrl}}/conversations/{conversationId}/messages
+Content-Type: application/json
+
+{
+  "role": "user",
+  "content": "Show me the database schema"
+}
+
+### Step 3: 添加助手回复
+POST {{baseUrl}}/conversations/{conversationId}/messages
+Content-Type: application/json
+
+{
+  "role": "assistant",
+  "content": "Here is the database schema with all tables and their columns..."
+}
+
+### Step 4: 获取对话及消息
+GET {{baseUrl}}/conversations/{conversationId}
+Content-Type: application/json
+
+### Step 5: 删除测试对话
+DELETE {{baseUrl}}/conversations/{conversationId}
+Content-Type: application/json
+

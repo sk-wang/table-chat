@@ -538,6 +538,29 @@ class AgentService:
         # This method is kept for API compatibility
         return True
 
+    async def generate_title(self, first_message: str) -> str:
+        if not self.is_available:
+            return first_message[:50] + "..." if len(first_message) > 50 else first_message
+
+        client = self._get_client()
+        if client is None:
+            return first_message[:50] + "..." if len(first_message) > 50 else first_message
+
+        try:
+            response = await client.messages.create(
+                model=settings.effective_model,
+                max_tokens=50,
+                system="Generate a concise 5-10 word title for this database query conversation. Return only the title, no quotes or punctuation.",
+                messages=[{"role": "user", "content": first_message}],
+            )
+            if response.content and len(response.content) > 0:
+                title = response.content[0].text.strip()
+                return title[:100] if len(title) > 100 else title
+        except Exception as e:
+            logger.warning(f"Failed to generate title: {e}")
+
+        return first_message[:50] + "..." if len(first_message) > 50 else first_message
+
 
 # Global instance
 agent_service = AgentService()

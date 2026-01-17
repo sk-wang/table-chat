@@ -10,6 +10,7 @@ const { TextArea } = Input;
 
 interface AgentChatProps {
   dbName: string;
+  connectionId?: string;
   disabled?: boolean;
   agentUnavailable?: boolean;
   onSQLGenerated?: (sql: string) => void;
@@ -17,6 +18,7 @@ interface AgentChatProps {
 
 export const AgentChat: React.FC<AgentChatProps> = ({
   dbName,
+  connectionId,
   disabled = false,
   agentUnavailable = false,
   onSQLGenerated,
@@ -35,7 +37,7 @@ export const AgentChat: React.FC<AgentChatProps> = ({
     sendMessage,
     cancel,
     clearError,
-  } = useAgentChat({ dbName, onSQLGenerated });
+  } = useAgentChat({ dbName, connectionId, onSQLGenerated });
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {

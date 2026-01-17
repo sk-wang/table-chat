@@ -1,0 +1,87 @@
+### TableChat API Tests - Conversations
+### Base URL
+@baseUrl = http://localhost:7888/api/v1
+
+### Variables
+@connectionId = test-db
+@conversationId = {{createConversation.response.body.id}}
+
+###############################################
+# Conversation CRUD Operations
+###############################################
+
+### Create a new conversation
+# @name createConversation
+POST {{baseUrl}}/dbs/{{connectionId}}/conversations
+Content-Type: application/json
+
+{
+  "title": "Test Conversation"
+}
+
+### Create conversation with default title
+POST {{baseUrl}}/dbs/{{connectionId}}/conversations
+Content-Type: application/json
+
+{}
+
+### List conversations for a connection
+GET {{baseUrl}}/dbs/{{connectionId}}/conversations?limit=50
+
+### Get a specific conversation with messages
+GET {{baseUrl}}/conversations/{{conversationId}}?messageLimit=100
+
+### Update conversation title (rename)
+PATCH {{baseUrl}}/conversations/{{conversationId}}
+Content-Type: application/json
+
+{
+  "title": "Renamed Conversation"
+}
+
+### Delete a conversation
+DELETE {{baseUrl}}/conversations/{{conversationId}}
+
+###############################################
+# Message Operations
+###############################################
+
+### Add a user message to conversation
+POST {{baseUrl}}/conversations/{{conversationId}}/messages
+Content-Type: application/json
+
+{
+  "role": "user",
+  "content": "Show me all users from the database"
+}
+
+### Add an assistant message with tool calls
+POST {{baseUrl}}/conversations/{{conversationId}}/messages
+Content-Type: application/json
+
+{
+  "role": "assistant",
+  "content": "I found 15 tables in the database. Let me check the users table schema.",
+  "toolCalls": [
+    {
+      "id": "toolu_01abc123",
+      "tool": "list_tables",
+      "input": {"schema": "public"},
+      "status": "completed",
+      "output": "Found 15 tables: users, orders, products...",
+      "durationMs": 234
+    }
+  ]
+}
+
+###############################################
+# Title Generation
+###############################################
+
+### Generate title using LLM
+POST {{baseUrl}}/conversations/{{conversationId}}/generate-title
+Content-Type: application/json
+
+{
+  "firstMessage": "Show me all orders from last week with customer names"
+}

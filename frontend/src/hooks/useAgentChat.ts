@@ -1,5 +1,7 @@
 import { useReducer, useRef, useCallback, useEffect } from 'react';
 import { apiClient } from '../services/api';
+import * as conversationApi from '../services/conversationApi';
+import { useConversation } from '../contexts/ConversationContext';
 import type {
   AgentMessage,
   AgentStatus,
@@ -11,6 +13,7 @@ import type {
   DoneEventData,
   ConversationTurn,
 } from '../types/agent';
+import type { ToolCallData } from '../types/conversation';
 
 // State type
 interface AgentState {
@@ -35,7 +38,8 @@ type AgentAction =
   | { type: 'SET_ERROR'; error: string }
   | { type: 'DONE' }
   | { type: 'CANCEL' }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'LOAD_HISTORY'; messages: AgentMessage[] };
 
 // Initial state
 const initialState: AgentState = {
@@ -189,13 +193,28 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
         error: action.error,
       };
 
-    case 'DONE':
+    case 'DONE': {
+      // Flush any remaining streaming text to messages before marking complete
+      let newMessages = state.messages;
+      if (state.streamingText) {
+        newMessages = [
+          ...newMessages,
+          {
+            id: `assistant-stream-${Date.now()}`,
+            role: 'assistant' as const,
+            content: state.streamingText,
+            timestamp: Date.now(),
+          },
+        ];
+      }
       return {
         ...state,
         status: 'completed',
         thinkingMessage: '',
         streamingText: '',
+        messages: newMessages,
       };
+    }
 
     case 'CANCEL':
       return {
@@ -211,6 +230,13 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
         status: 'idle',
       };
 
+    case 'LOAD_HISTORY':
+      return {
+        ...initialState,
+        messages: action.messages,
+        status: 'idle',
+      };
+
     default:
       return state;
   }
@@ -219,16 +245,76 @@ function agentReducer(state: AgentState, action: AgentAction): AgentState {
 // Hook
 interface UseAgentChatOptions {
   dbName: string;
+  connectionId?: string;
   onSQLGenerated?: (sql: string) => void;
 }
 
-export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
+export function useAgentChat({ dbName, connectionId, onSQLGenerated }: UseAgentChatOptions) {
   const [state, dispatch] = useReducer(agentReducer, initialState);
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Conversation context for persistence
+  const { 
+    activeConversationId, 
+    activeConversation,
+    createConversation, 
+    addMessage: addMessageToContext,
+    generateTitle 
+  } = useConversation();
+  
+  // Track if this is the first message in the conversation (for auto-title)
+  const isFirstMessageRef = useRef(true);
+  const conversationIdRef = useRef<string | null>(null);
 
   // Timeout duration (2 minutes)
   const TIMEOUT_MS = 120000;
+
+  // Track if we're currently processing to prevent history reload during active session
+  const isProcessingRef = useRef(false);
+
+  // Load messages from activeConversation when it changes (but not during active processing)
+  useEffect(() => {
+    if (isProcessingRef.current || stateRef.current.status !== 'idle') {
+      return;
+    }
+    
+    if (activeConversation?.messages) {
+      const agentMessages: AgentMessage[] = activeConversation.messages.map((msg) => {
+        if (msg.toolCalls && msg.toolCalls.length > 0) {
+          // Create tool messages for each tool call
+          return msg.toolCalls.map((tc) => ({
+            id: `tool-${tc.id}`,
+            role: 'tool' as const,
+            content: '',
+            timestamp: new Date(msg.createdAt).getTime(),
+            toolCall: {
+              id: tc.id,
+              name: tc.tool,
+              input: tc.input,
+              output: tc.output || undefined,
+              status: tc.status as 'running' | 'completed' | 'error',
+              durationMs: tc.durationMs || undefined,
+            },
+          }));
+        }
+        return [{
+          id: String(msg.id),
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          timestamp: new Date(msg.createdAt).getTime(),
+        }];
+      }).flat();
+      
+      dispatch({ type: 'LOAD_HISTORY', messages: agentMessages });
+      isFirstMessageRef.current = activeConversation.messages.length === 0;
+      conversationIdRef.current = activeConversation.id;
+    } else if (!activeConversationId) {
+      dispatch({ type: 'LOAD_HISTORY', messages: [] });
+      isFirstMessageRef.current = true;
+      conversationIdRef.current = null;
+    }
+  }, [activeConversation, activeConversationId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -242,30 +328,25 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
     };
   }, []);
 
-  // Extract conversation history from messages (last 3 complete rounds)
+  // Extract conversation history from messages (last 10 complete rounds for 20-message window)
   const extractHistory = useCallback((messages: AgentMessage[]): ConversationTurn[] => {
     const history: ConversationTurn[] = [];
 
-    // Find pairs of user + assistant messages (skip tool messages)
     let i = 0;
     while (i < messages.length) {
-      // Find a user message
       if (messages[i].role === 'user') {
         const userPrompt = messages[i].content;
 
-        // Find the next assistant message (skip tool messages)
         let j = i + 1;
         let assistantResponse = '';
 
         while (j < messages.length && messages[j].role !== 'user') {
           if (messages[j].role === 'assistant' && messages[j].content) {
-            // Concatenate all assistant responses in this round
             assistantResponse += (assistantResponse ? '\n' : '') + messages[j].content;
           }
           j++;
         }
 
-        // If we found both user and assistant, add to history
         if (userPrompt && assistantResponse) {
           history.push({
             user_prompt: userPrompt,
@@ -273,14 +354,13 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
           });
         }
 
-        i = j; // Move to next round
+        i = j;
       } else {
         i++;
       }
     }
 
-    // Return only last 3 rounds
-    return history.slice(-3);
+    return history.slice(-10);
   }, []);
 
   // Use refs to avoid dependency issues with callbacks
@@ -293,15 +373,69 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
     extractHistoryRef.current = extractHistory;
   });
 
+  // Helper to save message to backend
+  const saveMessageToBackend = useCallback(async (
+    convId: string,
+    role: 'user' | 'assistant',
+    content: string,
+    toolCalls?: ToolCallData[] | null
+  ) => {
+    try {
+      const savedMessage = await conversationApi.addMessage(convId, {
+        role,
+        content,
+        toolCalls,
+      });
+      addMessageToContext(savedMessage);
+    } catch (err) {
+      console.error('Failed to save message:', err);
+    }
+  }, [addMessageToContext]);
+
   // Send message
   const sendMessage = useCallback(
     async (prompt: string) => {
       if (!prompt.trim() || !dbName || stateRef.current.status !== 'idle') return;
+      if (!connectionId) return;
+
+      // Mark as processing to prevent history reload
+      isProcessingRef.current = true;
+
+      // Ensure we have a conversation
+      let convId = activeConversationId;
+      let shouldGenerateTitle = false;
+      
+      if (!convId) {
+        try {
+          const newConv = await createConversation(connectionId);
+          convId = newConv.id;
+          conversationIdRef.current = convId;
+          shouldGenerateTitle = true;
+        } catch (err) {
+          console.error('Failed to create conversation:', err);
+          dispatch({ type: 'SET_ERROR', error: 'Failed to create conversation' });
+          return;
+        }
+      } else {
+        conversationIdRef.current = convId;
+        shouldGenerateTitle = !activeConversation?.messages?.length;
+      }
+
+      const trimmedPrompt = prompt.trim();
+      
+      // Save user message to backend
+      await saveMessageToBackend(convId, 'user', trimmedPrompt);
 
       // Extract history BEFORE dispatching START (which adds the new user message)
       const history = extractHistoryRef.current(stateRef.current.messages);
 
-      dispatch({ type: 'START', prompt: prompt.trim() });
+      dispatch({ type: 'START', prompt: trimmedPrompt });
+
+      // Accumulate assistant response for saving
+      let accumulatedResponse = '';
+      let accumulatedToolCalls: ToolCallData[] = [];
+      // Track if we received text_delta events (streaming) to avoid duplicate message accumulation
+      let receivedTextDelta = false;
 
       const handlers = {
         onThinking: (data: ThinkingEventData) => {
@@ -309,23 +443,52 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
         },
         onTextDelta: (data: { text: string }) => {
           dispatch({ type: 'TEXT_DELTA', text: data.text });
+          accumulatedResponse += data.text;
+          receivedTextDelta = true;
         },
         onToolCall: (data: ToolCallEventData) => {
           dispatch({ type: 'UPDATE_TOOL_CALL', data });
+          if (data.status === 'completed' || data.status === 'error') {
+            const toolCall: ToolCallData = {
+              id: data.id,
+              tool: data.tool,
+              input: data.input || {},
+              status: data.status,
+              output: data.output || null,
+              durationMs: data.durationMs || null,
+            };
+            const existingIdx = accumulatedToolCalls.findIndex(tc => tc.id === data.id);
+            if (existingIdx >= 0) {
+              accumulatedToolCalls[existingIdx] = toolCall;
+            } else {
+              accumulatedToolCalls.push(toolCall);
+            }
+          }
         },
         onMessage: (data: MessageEventData) => {
-          dispatch({
-            type: 'ADD_MESSAGE',
-            message: {
-              id: `assistant-${Date.now()}`,
-              role: 'assistant',
-              content: data.content,
-              timestamp: Date.now(),
-            },
-          });
+          // Only add message and accumulate if we didn't receive text_delta (streaming)
+          // This prevents duplicate content when streaming is used
+          if (!receivedTextDelta) {
+            dispatch({
+              type: 'ADD_MESSAGE',
+              message: {
+                id: `assistant-${Date.now()}`,
+                role: 'assistant',
+                content: data.content,
+                timestamp: Date.now(),
+              },
+            });
+            accumulatedResponse += (accumulatedResponse ? '\n' : '') + data.content;
+          }
+          // If we received text_delta, the content is already accumulated via streaming
         },
         onSQL: (data: SQLEventData) => {
           dispatch({ type: 'SET_SQL', sql: data.sql, explanation: data.explanation });
+          // Only add SQL content if not already streamed
+          if (!receivedTextDelta) {
+            const sqlContent = `Generated SQL:\n\`\`\`sql\n${data.sql}\n\`\`\`\n\n${data.explanation || ''}`;
+            accumulatedResponse += (accumulatedResponse ? '\n' : '') + sqlContent;
+          }
         },
         onError: (data: ErrorEventData) => {
           const error = data.error + (data.detail ? `: ${data.detail}` : '');
@@ -335,20 +498,38 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
             timeoutRef.current = null;
           }
         },
-        onDone: (_data: DoneEventData) => {
+        onDone: async (_data: DoneEventData) => {
+          // Flush any remaining streaming text to messages before completing
+          dispatch({ type: 'FLUSH_STREAMING' });
           dispatch({ type: 'DONE' });
           if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
             timeoutRef.current = null;
           }
-          // Reset to idle after a short delay
+
+          if (conversationIdRef.current && accumulatedResponse) {
+            await saveMessageToBackend(
+              conversationIdRef.current,
+              'assistant',
+              accumulatedResponse,
+              accumulatedToolCalls.length > 0 ? accumulatedToolCalls : null
+            );
+
+            if (shouldGenerateTitle) {
+              generateTitle(conversationIdRef.current, trimmedPrompt).catch(err => {
+                console.error('Failed to generate title:', err);
+              });
+            }
+          }
+
+          isProcessingRef.current = false;
           setTimeout(() => dispatch({ type: 'RESET' }), 500);
         },
       };
 
       abortControllerRef.current = apiClient.agentQuery(
         dbName,
-        { prompt: prompt.trim(), history },
+        { prompt: trimmedPrompt, history },
         handlers
       );
 
@@ -360,7 +541,7 @@ export function useAgentChat({ dbName, onSQLGenerated }: UseAgentChatOptions) {
         }
       }, TIMEOUT_MS);
     },
-    [dbName]
+    [dbName, connectionId, activeConversationId, activeConversation, createConversation, saveMessageToBackend, generateTitle]
   );
 
   // Cancel request
